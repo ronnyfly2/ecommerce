@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ecommerce_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d ecommerce_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: ecommerce_test
+      DB_SSL: false
+      JWT_SECRET: ci_jwt_secret_key_32_chars_minimum
+      JWT_EXPIRES_IN: 24h
+      JWT_REFRESH_SECRET: ci_refresh_secret_key_32_chars
+      JWT_REFRESH_EXPIRES_IN: 30d
+      JWT_REFRESH_COOKIE_NAME: refresh_token
+      JWT_REFRESH_COOKIE_SECURE: false
+      JWT_REFRESH_COOKIE_SAME_SITE: lax
+      JWT_REFRESH_FINGERPRINT_SALT: ci_fingerprint_salt_16_chars
+      UPLOAD_DIR: uploads
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm run test -- --runInBand
+
+      - name: E2E tests
+        run: npm run test:e2e
