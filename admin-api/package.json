@@ -9,6 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
+    "dev:clean": "sh -c 'PORT=${PORT:-3000}; PIDS=$(lsof -ti tcp:$PORT); if [ -n \"$PIDS\" ]; then kill -15 $PIDS || true; sleep 1; fi; npm run start:dev'",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -20,7 +21,11 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:run": "ts-node -r tsconfig-paths/register scripts/migrations.ts",
     "migration:revert": "ts-node -r tsconfig-paths/register scripts/migration-revert.ts",
-    "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts",
+    "seed:clean": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts",
+    "seed:clean:force": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --force",
+    "seed:clean:users-all": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --users-all",
+    "seed:clean:all": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --all"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

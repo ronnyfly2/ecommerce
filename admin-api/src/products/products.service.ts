@@ -9,8 +9,10 @@ import { Category } from '../categories/entities/category.entity';
 import { Color } from '../colors/entities/color.entity';
 import { Size } from '../sizes/entities/size.entity';
 import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductImageDto } from './dto/create-product-image.dto';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { QueryProductsDto } from './dto/query-products.dto';
+import { UpdateProductImageDto } from './dto/update-product-image.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { ProductImage } from './entities/product-image.entity';
@@ -271,6 +273,88 @@ export class ProductsService {
     }
 
     await this.variantsRepository.delete(variantId);
+    return { deleted: true };
+  }
+
+  async createImage(productId: string, dto: CreateProductImageDto) {
+    const product = await this.productsRepository.findOne({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const desiredOrder = dto.displayOrder ?? 0;
+
+    if (dto.isMain) {
+      await this.imagesRepository.update(
+        { product: { id: productId }, isMain: true },
+        { isMain: false },
+      );
+    }
+
+    const image = this.imagesRepository.create({
+      product,
+      url: dto.url,
+      altText: dto.altText ?? null,
+      displayOrder: desiredOrder,
+      isMain: dto.isMain ?? false,
+    });
+
+    return this.imagesRepository.save(image);
+  }
+
+  async updateImage(
+    productId: string,
+    imageId: string,
+    dto: UpdateProductImageDto,
+  ) {
+    const image = await this.imagesRepository.findOne({
+      where: { id: imageId, product: { id: productId } },
+      relations: { product: true },
+    });
+
+    if (!image) {
+      throw new NotFoundException('Image not found');
+    }
+
+    if (dto.url !== undefined) {
+      image.url = dto.url;
+    }
+
+    if (dto.altText !== undefined) {
+      image.altText = dto.altText ?? null;
+    }
+
+    if (dto.displayOrder !== undefined) {
+      image.displayOrder = dto.displayOrder;
+    }
+
+    if (dto.isMain !== undefined) {
+      if (dto.isMain) {
+        await this.imagesRepository.update(
+          { product: { id: productId }, isMain: true },
+          { isMain: false },
+        );
+      }
+      image.isMain = dto.isMain;
+    }
+
+    return this.imagesRepository.save(image);
+  }
+
+  async removeImage(productId: string, imageId: string) {
+    const image = await this.imagesRepository.findOne({
+      where: { id: imageId, product: { id: productId } },
+      relations: { product: true },
+    });
+
+    if (!image) {
+      throw new NotFoundException('Image not found');
+    }
+
+    await this.imagesRepository.delete(imageId);
     return { deleted: true };
   }
 

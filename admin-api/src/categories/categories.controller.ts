@@ -10,7 +10,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
-import { CategoriesService } from './categories.service';
+import { CategoriesService, type CategoryTreeNode } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
@@ -32,7 +32,7 @@ export class CategoriesController {
   }
 
   @Get('tree')
-  findTree() {
+  findTree(): Promise<CategoryTreeNode[]> {
     return this.categoriesService.findTree();
   }
 

@@ -18,5 +18,9 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_COOKIE_SECURE: Joi.boolean().default(false),
   JWT_REFRESH_COOKIE_SAME_SITE: Joi.string().valid('lax', 'strict', 'none').default('lax'),
   JWT_REFRESH_FINGERPRINT_SALT: Joi.string().min(16).optional(),
+  SEED_API_ENABLED: Joi.boolean().default(false),
+  SEED_API_CONFIRMATION_PHRASE: Joi.string().min(3).default('CONFIRMAR'),
+  SEED_CUSTOMER_PASSWORD: Joi.string().min(8).default('Customer2026!'),
   UPLOAD_DIR: Joi.string().default('./uploads'),
+  CORS_ORIGIN: Joi.string().optional(),
 });

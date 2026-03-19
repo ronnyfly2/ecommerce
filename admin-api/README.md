@@ -124,6 +124,89 @@ npm run build
 # Genera carpeta dist/ lista para CI/CD
 ```
 
+## Checklist de despliegue a producción
+
+### Variables de entorno obligatorias en producción
+
+```env
+NODE_ENV=production
+
+# Base de datos
+DB_HOST=...
+DB_PORT=5432
+DB_USER=...
+DB_PASS=...
+DB_NAME=...
+DB_SSL=true
+
+# JWT — usar valores largos y aleatorios (mínimo 32 chars)
+JWT_SECRET=<valor-aleatorio-min-32>
+JWT_REFRESH_SECRET=<valor-aleatorio-min-32>
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=30d
+
+# Cookie de refresh (HTTPS obligatorio en prod)
+JWT_REFRESH_COOKIE_SECURE=true
+JWT_REFRESH_COOKIE_SAME_SITE=strict
+JWT_REFRESH_FINGERPRINT_SALT=<valor-aleatorio-min-16>
+
+# CORS — dominios autorizados separados por coma
+CORS_ORIGIN=https://yourdomain.com
+
+# Almacenamiento
+UPLOAD_DIR=./uploads
+```
+
+### Pasos previos al primer despliegue
+
+```bash
+# 1. Ejecutar migraciones (synchronize está deshabilitado en producción)
+npm run migration:run
+
+# 2. Poblar datos iniciales (usuarios admin/superadmin)
+SEED_SUPER_ADMIN_EMAIL=admin@tudominio.com \
+SEED_SUPER_ADMIN_PASSWORD=<password-seguro> \
+npm run seed
+
+# 3. Iniciar en producción
+npm run start:prod
+```
+
+### Verificación post-despliegue (smoke test)
+
+```bash
+BASE_URL=https://api.tudominio.com
+
+# Health check — no requiere autenticación
+curl "$BASE_URL/api/health"
+# Esperado: {"data":{"status":"ok","db":"connected",...}}
+
+# Login
+curl -s -c /tmp/cookies.txt -X POST "$BASE_URL/api/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@tudominio.com","password":"<password>"}' | jq .data.accessToken
+
+# Verificar identidad con el access token
+TOKEN=<access_token_del_paso_anterior>
+curl -s "$BASE_URL/api/auth/me" \
+  -H "Authorization: Bearer $TOKEN" | jq .data.email
+```
+
+### Resumen de medidas de seguridad activas en producción
+
+| Aspecto | Estado | Detalle |
+|---|---|---|
+| TypeORM synchronize | ✅ Deshabilitado | Usar `migration:run` en prod |
+| Swagger | ✅ Solo en dev | No expuesto cuando `NODE_ENV=production` |
+| Cookie refresh `secure` | ✅ Auto en prod | Requiere HTTPS |
+| Cookie `sameSite` | ✅ `strict` en prod | |
+| CORS | ✅ Configurable | Controlado por `CORS_ORIGIN` |
+| Graceful shutdown | ✅ Activo | Compatible con Docker/Kubernetes |
+| Rate limiting | ⚠️ En memoria | Migrar a Redis para múltiples instancias |
+| Uploads | ⚠️ Almacenamiento local | Migrar a S3/GCS en producción real |
+
+---
+
 ## CI (GitHub Actions)
 
 El proyecto incluye un pipeline en GitHub Actions: [.github/workflows/ci.yml](.github/workflows/ci.yml).

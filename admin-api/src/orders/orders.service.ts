@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { QueryOrdersDto } from './dto/query-orders.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -20,6 +20,7 @@ import { CouponUsage } from '../coupons/entities/coupon-usage.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { InventoryMovementType } from '../inventory/enums/inventory-movement-type.enum';
 import { User } from '../users/entities/user.entity';
+import { Role } from '../common/enums/role.enum';
 
 @Injectable()
 export class OrdersService {
@@ -140,12 +141,16 @@ export class OrdersService {
     return this.findOne(savedOrder.id);
   }
 
-  async findAll(userId: string, query: QueryOrdersDto) {
+  async findAll(requestUser: Pick<User, 'id' | 'role'>, query: QueryOrdersDto) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 10, 100);
     const skip = (page - 1) * limit;
 
-    const where: any = { user: { id: userId } };
+    const where: FindOptionsWhere<Order> = {};
+
+    if (!this.isAdminRole(requestUser.role)) {
+      where.user = { id: requestUser.id } as User;
+    }
 
     if (query.status) {
       where.status = query.status;
@@ -213,10 +218,12 @@ export class OrdersService {
     return this.ordersRepository.save(order);
   }
 
-  async getStats(userId: string) {
-    const orders = await this.ordersRepository.find({
-      where: { user: { id: userId } },
-    });
+  async getStats(requestUser: Pick<User, 'id' | 'role'>) {
+    const where: FindOptionsWhere<Order> = this.isAdminRole(requestUser.role)
+      ? {}
+      : { user: { id: requestUser.id } as User };
+
+    const orders = await this.ordersRepository.find({ where });
 
     const totalOrders = orders.length;
     const totalSpent = orders.reduce((sum, order) => sum + Number(order.total), 0);
@@ -236,10 +243,20 @@ export class OrdersService {
 
     return {
       totalOrders,
+      totalRevenue: Number(totalSpent.toFixed(2)),
+      pendingOrders: statusCounts[OrderStatus.PENDING],
+      confirmedOrders: statusCounts[OrderStatus.CONFIRMED],
+      shippedOrders: statusCounts[OrderStatus.SHIPPED],
+      deliveredOrders: statusCounts[OrderStatus.DELIVERED],
+      cancelledOrders: statusCounts[OrderStatus.CANCELLED],
       totalSpent: totalSpent.toFixed(2),
       averageOrderValue: averageOrderValue.toFixed(2),
       statusCounts,
     };
+  }
+
+  private isAdminRole(role: Role): boolean {
+    return role === Role.ADMIN || role === Role.SUPER_ADMIN;
   }
 
   private async decrementInventory(order: Order) {

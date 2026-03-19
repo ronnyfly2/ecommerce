@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CouponsModule } from './coupons/coupons.module';
+import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { envValidationSchema } from './config/env.validation';
@@ -17,6 +18,7 @@ import { AppService } from './app.service';
 import { ColorsModule } from './colors/colors.module';
 import { UsersModule } from './users/users.module';
 import { SizesModule } from './sizes/sizes.module';
+import { AdminToolsModule } from './admin-tools/admin-tools.module';
 import { User } from './users/entities/user.entity';
 
 @Module({
@@ -37,7 +39,7 @@ import { User } from './users/entities/user.entity';
         database: configService.getOrThrow<string>('DB_NAME'),
         entities: [User],
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: configService.get<string>('NODE_ENV') !== 'production',
         ssl: configService.get<boolean>('DB_SSL')
           ? { rejectUnauthorized: false }
           : false,
@@ -53,6 +55,8 @@ import { User } from './users/entities/user.entity';
     InventoryModule,
     CouponsModule,
     OrdersModule,
+    HealthModule,
+    AdminToolsModule,
   ],
   controllers: [AppController],
   providers: [

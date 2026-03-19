@@ -8,6 +8,16 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 
+type HttpExceptionResponseShape = {
+  message?: string | string[];
+  error?: string;
+  statusCode?: number;
+};
+
+function isHttpExceptionResponseShape(value: unknown): value is HttpExceptionResponseShape {
+  return typeof value === 'object' && value !== null;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -19,16 +29,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
-    let error: any = {};
+    let error: HttpExceptionResponseShape = {};
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
-      if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        const res = exceptionResponse as any;
-        message = res.message || exception.message;
-        error = res;
+      if (isHttpExceptionResponseShape(exceptionResponse)) {
+        const responseMessage = exceptionResponse.message;
+        message = Array.isArray(responseMessage)
+          ? responseMessage[0] ?? exception.message
+          : (responseMessage ?? exception.message);
+        error = exceptionResponse;
       } else {
         message = exception.message;
       }

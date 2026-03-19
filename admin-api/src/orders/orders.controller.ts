@@ -32,15 +32,15 @@ export class OrdersController {
 
   @Get()
   findAll(
-    @GetUser('id') userId: string,
+    @GetUser() user: Express.User,
     @Query() query: QueryOrdersDto,
   ) {
-    return this.ordersService.findAll(userId, query);
+    return this.ordersService.findAll(user, query);
   }
 
   @Get('stats')
-  stats(@GetUser('id') userId: string) {
-    return this.ordersService.getStats(userId);
+  stats(@GetUser() user: Express.User) {
+    return this.ordersService.getStats(user);
   }
 
   @Get(':id')

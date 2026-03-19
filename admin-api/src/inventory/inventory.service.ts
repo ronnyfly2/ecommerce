@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { CreateInventoryAdjustmentDto } from './dto/create-inventory-adjustment.dto';
 import { QueryInventoryMovementsDto } from './dto/query-inventory-movements.dto';
 import { InventoryMovement } from './entities/inventory-movement.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class InventoryService {
@@ -13,6 +14,8 @@ export class InventoryService {
     private readonly movementsRepository: Repository<InventoryMovement>,
     @InjectRepository(ProductVariant)
     private readonly variantsRepository: Repository<ProductVariant>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
   ) {}
 
   async createMovement(
@@ -24,7 +27,12 @@ export class InventoryService {
     });
 
     if (!variant) {
-      throw new Error('Variant not found');
+      throw new NotFoundException('Variant not found');
+    }
+
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
     const movement = this.movementsRepository.create({
@@ -32,7 +40,7 @@ export class InventoryService {
       quantityChange: dto.quantityChange,
       type: dto.type,
       reason: dto.reason ?? null,
-      createdBy: { id: userId } as any,
+      createdBy: user,
     });
 
     return this.movementsRepository.save(movement);
@@ -43,9 +51,9 @@ export class InventoryService {
     const limit = Math.min(query.limit ?? 10, 100);
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: FindOptionsWhere<InventoryMovement> = {};
     if (query.variantId) {
-      where.variant = { id: query.variantId };
+      where.variant = { id: query.variantId } as ProductVariant;
     }
 
     const [items, total] = await this.movementsRepository.findAndCount({

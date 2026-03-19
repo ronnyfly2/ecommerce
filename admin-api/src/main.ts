@@ -14,6 +14,24 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
+  // CORS
+  const corsOrigin = configService.get<string>('CORS_ORIGIN');
+  const configuredOrigins = corsOrigin
+    ? corsOrigin
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : [];
+  const defaultDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'];
+  const allowedOrigins =
+    configuredOrigins.length > 0 ? configuredOrigins : isProduction ? [] : defaultDevOrigins;
+
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+  });
 
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -38,15 +56,21 @@ async function bootstrap() {
 
   app.useStaticAssets(absoluteUploadDir, { prefix: '/uploads' });
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Ecommerce Admin API')
-    .setDescription('Admin panel backend for ecommerce platform')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
+  // Swagger solo en desarrollo
+  if (!isProduction) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Ecommerce Admin API')
+      .setDescription('Admin panel backend for ecommerce platform')
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
+
+  // Graceful shutdown
+  app.enableShutdownHooks();
 
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);

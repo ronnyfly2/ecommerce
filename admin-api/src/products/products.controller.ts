@@ -12,8 +12,10 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductImageDto } from './dto/create-product-image.dto';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { QueryProductsDto } from './dto/query-products.dto';
+import { UpdateProductImageDto } from './dto/update-product-image.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { ProductsService } from './products.service';
@@ -78,5 +80,24 @@ export class ProductsController {
     @Param('variantId') variantId: string,
   ) {
     return this.productsService.removeVariant(id, variantId);
+  }
+
+  @Post(':id/images')
+  createImage(@Param('id') id: string, @Body() dto: CreateProductImageDto) {
+    return this.productsService.createImage(id, dto);
+  }
+
+  @Patch(':id/images/:imageId')
+  updateImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @Body() dto: UpdateProductImageDto,
+  ) {
+    return this.productsService.updateImage(id, imageId, dto);
+  }
+
+  @Delete(':id/images/:imageId')
+  removeImage(@Param('id') id: string, @Param('imageId') imageId: string) {
+    return this.productsService.removeImage(id, imageId);
   }
 }

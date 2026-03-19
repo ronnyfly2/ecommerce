@@ -161,10 +161,11 @@ export class AuthController {
 
   private setRefreshCookie(response: Response, refreshToken: string) {
     const cookieName = this.configService.get<string>('JWT_REFRESH_COOKIE_NAME') ?? 'refresh_token';
-    const secure = this.configService.get<boolean>('JWT_REFRESH_COOKIE_SECURE', false);
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const secure = isProduction || this.configService.get<boolean>('JWT_REFRESH_COOKIE_SECURE', false);
     const sameSite =
       this.configService.get<'lax' | 'strict' | 'none'>('JWT_REFRESH_COOKIE_SAME_SITE') ??
-      'lax';
+      (isProduction ? 'strict' : 'lax');
 
     response.cookie(cookieName, refreshToken, {
       httpOnly: true,

@@ -9,6 +9,11 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
 
+// Typed tree node structure for categories
+export interface CategoryTreeNode extends Category {
+  children: CategoryTreeNode[];
+}
+
 @Injectable()
 export class CategoriesService {
   constructor(
@@ -47,14 +52,14 @@ export class CategoriesService {
     });
   }
 
-  async findTree() {
+  async findTree(): Promise<CategoryTreeNode[]> {
     const categories = await this.categoriesRepository.find({
       relations: { parent: true },
       order: { displayOrder: 'ASC', name: 'ASC' },
     });
 
-    const map = new Map<string, any>();
-    const roots: any[] = [];
+    const map = new Map<string, CategoryTreeNode>();
+    const roots: CategoryTreeNode[] = [];
 
     for (const category of categories) {
       map.set(category.id, { ...category, children: [] });
@@ -62,8 +67,13 @@ export class CategoriesService {
 
     for (const category of categories) {
       const node = map.get(category.id);
+      if (!node) continue;
+      
       if (category.parent?.id && map.has(category.parent.id)) {
-        map.get(category.parent.id).children.push(node);
+        const parentNode = map.get(category.parent.id);
+        if (parentNode) {
+          parentNode.children.push(node);
+        }
       } else {
         roots.push(node);
       }
