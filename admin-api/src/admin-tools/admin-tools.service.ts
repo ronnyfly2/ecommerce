@@ -174,7 +174,10 @@ export class AdminToolsService {
       },
     ];
 
-    const userResults = await Promise.all(seedUsers.map((userData) => upsertSeedUser(userData)));
+    const userResults: string[] = [];
+    for (const userData of seedUsers) {
+      userResults.push(await upsertSeedUser(userData));
+    }
 
     const seedSizes = [
       { name: 'Extra Small', abbreviation: 'XS', displayOrder: 1 },

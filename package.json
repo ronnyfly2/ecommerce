@@ -1,0 +1,15 @@
+{
+  "name": "ecommerce-workspace",
+  "private": true,
+  "scripts": {
+    "start": "concurrently -k -n api,panel -c blue,green \"npm run start:api\" \"npm run start:panel\"",
+    "dev": "npm run start",
+    "start:api": "sh -c 'MAIL_PROVIDER=${MAIL_PROVIDER:-noop} RESEND_API_KEY=${RESEND_API_KEY:-dummy} npm --prefix admin-api run dev:clean'",
+    "start:panel": "npm --prefix admin-panel run dev:clean",
+    "build": "npm --prefix admin-api run build && npm --prefix admin-panel run build",
+    "install:all": "npm --prefix admin-api install && npm --prefix admin-panel install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

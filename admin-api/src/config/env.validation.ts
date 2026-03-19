@@ -9,6 +9,7 @@ export const envValidationSchema = Joi.object({
   DB_PASS: Joi.string().required(),
   DB_NAME: Joi.string().required(),
   DB_SSL: Joi.boolean().default(false),
+  DB_SYNCHRONIZE: Joi.boolean().default(false),
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('7d'),
   JWT_EXPIRY: Joi.string().optional(),

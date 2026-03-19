@@ -21,6 +21,9 @@ ecommerce/
 ### Installation
 
 ```bash
+# Install workspace tooling
+npm install
+
 # Install backend dependencies
 cd admin-api
 npm install
@@ -32,21 +35,30 @@ cd ../admin-panel
 npm install
 ```
 
+The backend always connects using the database settings from `admin-api/.env`. Runtime schema sync is disabled by default, so run migrations before starting the API.
+
 ### Running Development Servers
 
 ```bash
+# Unified development command from repository root
+npm run dev
+
+# Or run the services separately
+
 # Terminal 1: Backend API (runs on http://localhost:3000)
 cd admin-api
-npm run start
+npm run start:dev
 
 # Terminal 2: Frontend Panel (runs on http://localhost:5173)
 cd admin-panel
-npm run dev
+npm run dev:clean
 
 # Terminal 3: Run E2E tests
 cd admin-panel
 npm run e2e:open
 ```
+
+The root `npm run dev` command starts both services together and defaults the backend mail provider to `noop` for local development unless `MAIL_PROVIDER` is already set in the shell.
 
 ## API Response Format Standards
 

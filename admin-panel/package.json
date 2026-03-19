@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:clean": "sh -c 'PORT=${PORT:-5173}; PIDS=$(lsof -ti tcp:$PORT); if [ -n \"$PIDS\" ]; then kill -15 $PIDS || true; sleep 1; fi; npm run dev -- --host 0.0.0.0 --port $PORT'",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "e2e": "cypress run",

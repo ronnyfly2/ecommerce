@@ -40,7 +40,7 @@ import { User } from './users/entities/user.entity';
         database: configService.getOrThrow<string>('DB_NAME'),
         entities: [User],
         autoLoadEntities: true,
-        synchronize: configService.get<string>('NODE_ENV') !== 'production',
+        synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
         ssl: configService.get<boolean>('DB_SSL')
           ? { rejectUnauthorized: false }
           : false,
