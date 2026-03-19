@@ -345,6 +345,48 @@ export interface OrderStats {
   cancelledOrders: number
 }
 
+export interface DashboardLowStockVariant {
+  id: string
+  sku: string
+  stock: number
+  productName: string
+  sizeName: string
+  colorName: string
+}
+
+export interface DashboardInventoryAlerts {
+  threshold: number
+  lowStockCount: number
+  outOfStockCount: number
+  lowStockVariants: DashboardLowStockVariant[]
+}
+
+export interface DashboardSalesTrendPoint {
+  date: string
+  label: string
+  orders: number
+  revenue: number
+}
+
+export interface DashboardSalesInsights {
+  trendLast7Days: {
+    totalOrders: number
+    totalRevenue: number
+    points: DashboardSalesTrendPoint[]
+  }
+  weekComparison: {
+    currentWeekRevenue: number
+    previousWeekRevenue: number
+    deltaPercent: number | null
+  }
+}
+
+export interface DashboardSummary {
+  orderStats: OrderStats
+  sales: DashboardSalesInsights
+  inventoryAlerts: DashboardInventoryAlerts | null
+}
+
 // ----------------------------------------------------------
 // Coupons
 // ----------------------------------------------------------

@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { envValidationSchema } from './config/env.validation';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { ImagesModule } from './images/images.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -52,6 +53,7 @@ import { User } from './users/entities/user.entity';
     ColorsModule,
     CategoriesModule,
     ProductsModule,
+    DashboardModule,
     ImagesModule,
     InventoryModule,
     NotificationsModule,
