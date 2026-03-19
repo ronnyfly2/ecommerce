@@ -70,6 +70,12 @@ SEED_ADMIN_PASSWORD=ChangeMeAdmin123!
 
 # Upload
 UPLOAD_DIR=uploads
+
+# Notificaciones por email
+APP_URL=https://admin.tudominio.com
+MAIL_PROVIDER=noop # noop | resend
+MAIL_FROM=Ecommerce <no-reply@tudominio.com>
+RESEND_API_KEY=
 ```
 
 ### 3. Database setup
@@ -155,6 +161,12 @@ CORS_ORIGIN=https://yourdomain.com
 
 # Almacenamiento
 UPLOAD_DIR=./uploads
+
+# Notificaciones
+APP_URL=https://admin.tudominio.com
+MAIL_PROVIDER=resend
+MAIL_FROM=Ecommerce <no-reply@tudominio.com>
+RESEND_API_KEY=<re_xxxxxxxxxxxxxxxxx>
 ```
 
 ### Pasos previos al primer despliegue
@@ -204,6 +216,47 @@ curl -s "$BASE_URL/api/auth/me" \
 | Graceful shutdown | ✅ Activo | Compatible con Docker/Kubernetes |
 | Rate limiting | ⚠️ En memoria | Migrar a Redis para múltiples instancias |
 | Uploads | ⚠️ Almacenamiento local | Migrar a S3/GCS en producción real |
+
+---
+
+## Operación de recuperación de contraseña
+
+### Checklist rápido
+
+1. Verificar `APP_URL` para que el link de reset apunte al dominio correcto del panel.
+2. Confirmar `MAIL_PROVIDER` por entorno (`noop` en dev, `resend` en staging/prod).
+3. Configurar `MAIL_FROM` con dominio verificado en el proveedor de correo.
+4. Mantener `RESEND_API_KEY` solo en secretos del entorno (no en repositorio).
+
+### Monitoreo mínimo recomendado
+
+1. Alertar cuando aparezcan logs `Password reset email failed`.
+2. Revisar frecuencia de `Password reset failed: invalid token` para detectar abuso.
+3. Medir tasa de éxito de `Password reset completed` por día.
+
+### Smoke test del flujo
+
+```bash
+BASE_URL=https://api.tudominio.com
+
+# Solicitar recuperación
+curl -s -X POST "$BASE_URL/api/auth/forgot-password" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"usuario@tudominio.com"}'
+
+# Restablecer contraseña (con token real recibido por email)
+curl -s -X POST "$BASE_URL/api/auth/reset-password" \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"<token>","password":"NewPass123!"}'
+```
+
+### Frontend E2E
+
+Si el panel no corre en `http://localhost:5173`, Cypress puede apuntar a otra URL:
+
+```bash
+CYPRESS_BASE_URL=http://localhost:5175 npx cypress run --spec cypress/e2e/auth-password-recovery.cy.ts
+```
 
 ---
 
