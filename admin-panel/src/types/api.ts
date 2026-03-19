@@ -110,6 +110,15 @@ export interface RegisterDto {
   lastName?: string
 }
 
+export interface ForgotPasswordDto {
+  email: string
+}
+
+export interface ResetPasswordDto {
+  token: string
+  password: string
+}
+
 export type SeedCleanMode = 'seed' | 'users-all' | 'all'
 
 // ----------------------------------------------------------

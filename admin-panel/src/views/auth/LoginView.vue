@@ -110,6 +110,16 @@ async function submit() {
             required
           />
 
+          <div class="flex justify-end">
+            <button
+              type="button"
+              class="text-sm text-[--color-primary-700] hover:text-[--color-primary-800]"
+              @click="router.push({ name: 'forgot-password' })"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+
           <div v-if="error" class="text-sm text-[--color-danger-600] bg-[--color-danger-50] rounded-lg px-3 py-2">
             {{ error }}
           </div>

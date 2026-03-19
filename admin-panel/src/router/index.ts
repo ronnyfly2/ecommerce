@@ -12,6 +12,18 @@ const router = createRouter({
       component: () => import('@/views/auth/LoginView.vue'),
       meta: { public: true, layout: 'auth' },
     },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/auth/ForgotPasswordView.vue'),
+      meta: { public: true, layout: 'auth' },
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('@/views/auth/ResetPasswordView.vue'),
+      meta: { public: true, layout: 'auth' },
+    },
 
     // Dashboard shell
     {
@@ -149,7 +161,8 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (to.name === 'login' && auth.isAuthenticated) {
+  const authPublicPages = new Set(['login', 'forgot-password', 'reset-password'])
+  if (to.name && authPublicPages.has(String(to.name)) && auth.isAuthenticated) {
     return { name: 'dashboard' }
   }
 })

@@ -1,5 +1,13 @@
 import { http, setAccessToken, clearTokens } from './http'
-import type { ApiResponse, LoginDto, LoginResponse, User, RefreshTokenRecord } from '@/types/api'
+import type {
+  ApiResponse,
+  ForgotPasswordDto,
+  LoginDto,
+  LoginResponse,
+  RefreshTokenRecord,
+  ResetPasswordDto,
+  User,
+} from '@/types/api'
 
 export const authService = {
   async login(dto: LoginDto) {
@@ -37,5 +45,15 @@ export const authService = {
 
   async revokeSession(tokenId: string) {
     await http.post('/auth/logout-device', { tokenId })
+  },
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const res = await http.post<ApiResponse<{ message: string }>>('/auth/forgot-password', dto)
+    return res.data.data
+  },
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const res = await http.post<ApiResponse<{ message: string }>>('/auth/reset-password', dto)
+    return res.data.data
   },
 }
