@@ -12,6 +12,7 @@ import { InventoryMovement } from '../inventory/entities/inventory-movement.enti
 import { User } from '../users/entities/user.entity';
 import { CouponsService } from '../coupons/coupons.service';
 import { CouponsModule } from '../coupons/coupons.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CouponsModule } from '../coupons/coupons.module';
       User,
     ]),
     CouponsModule,
+    NotificationsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

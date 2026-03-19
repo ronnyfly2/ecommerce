@@ -19,6 +19,7 @@ import { Coupon } from '../coupons/entities/coupon.entity';
 import { CouponUsage } from '../coupons/entities/coupon-usage.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
 import { InventoryMovementType } from '../inventory/enums/inventory-movement-type.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/entities/user.entity';
 import { Role } from '../common/enums/role.enum';
 
@@ -42,6 +43,7 @@ export class OrdersService {
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly couponsService: CouponsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateOrderDto, userId: string) {
@@ -138,7 +140,10 @@ export class OrdersService {
       );
     }
 
-    return this.findOne(savedOrder.id);
+    const persistedOrder = await this.findOne(savedOrder.id);
+    await this.notificationsService.sendOrderConfirmation(persistedOrder);
+
+    return persistedOrder;
   }
 
   async findAll(requestUser: Pick<User, 'id' | 'role'>, query: QueryOrdersDto) {

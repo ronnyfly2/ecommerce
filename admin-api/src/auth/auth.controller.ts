@@ -13,9 +13,11 @@ import { GetUser } from '../common/decorators/get-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthRateLimiterService } from './auth-rate-limiter.service';
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RevokeSessionDto } from './dto/revoke-session.dto';
 
 @ApiTags('Auth')
@@ -141,6 +143,35 @@ export class AuthController {
   @Get('me')
   me(@GetUser('id') userId: string) {
     return this.authService.me(userId);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() request: Request) {
+    const normalizedEmail = dto.email.toLowerCase();
+    const clientIp = this.getClientIp(request);
+
+    this.authRateLimiterService.assertWithinLimit(
+      `forgot-password:${clientIp}:${normalizedEmail}`,
+      3,
+      3600_000,
+      'Too many password reset requests. Please try again later.',
+    );
+
+    return await this.authService.forgotPassword(normalizedEmail);
+  }
+
+  @Public()
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto, @Req() request: Request) {
+    this.authRateLimiterService.assertWithinLimit(
+      `reset-password:${this.getClientIp(request)}`,
+      8,
+      3600_000,
+      'Too many password reset attempts. Please try again later.',
+    );
+
+    return await this.authService.resetPassword(dto.token, dto.password);
   }
 
   private getRefreshTokenFromCookie(request: Request) {

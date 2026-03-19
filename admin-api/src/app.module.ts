@@ -11,6 +11,7 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { envValidationSchema } from './config/env.validation';
 import { ImagesModule } from './images/images.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OrdersModule } from './orders/orders.module';
 import { ProductsModule } from './products/products.module';
 import { AppController } from './app.controller';
@@ -53,6 +54,7 @@ import { User } from './users/entities/user.entity';
     ProductsModule,
     ImagesModule,
     InventoryModule,
+    NotificationsModule,
     CouponsModule,
     OrdersModule,
     HealthModule,

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,7 +11,9 @@ import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { PasswordResetMailService } from './services/password-reset-mail.service';
 import { JwtPayload } from './types/jwt-payload.type';
 
 type AuthRequestContext = {
@@ -21,13 +23,18 @@ type AuthRequestContext = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokensRepository: Repository<RefreshToken>,
+    @InjectRepository(PasswordResetToken)
+    private readonly passwordResetTokensRepository: Repository<PasswordResetToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly passwordResetMailService: PasswordResetMailService,
   ) {}
 
   async register(dto: RegisterDto, requestContext: AuthRequestContext) {
@@ -214,6 +221,98 @@ export class AuthService {
       expiresAt: session.expiresAt,
       lastUsedAt: session.lastUsedAt,
     }));
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const normalizedEmail = email.toLowerCase();
+    const user = await this.usersRepository.findOne({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      this.logger.warn(`Password reset requested for non-existing email: ${normalizedEmail}`);
+      // Don't reveal if email doesn't exist (security best practice)
+      return { message: 'If that email exists, you will receive a password reset link' };
+    }
+
+    // Generate reset token
+    const resetToken = randomUUID();
+    const tokenHash = this.hashToken(resetToken);
+
+    // Expire in 1 hour
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    // Invalidate all previous tokens for this user before issuing a new one
+    await this.passwordResetTokensRepository.delete({
+      user: { id: user.id },
+    });
+
+    // Create new token record
+    const tokenRecord = this.passwordResetTokensRepository.create({
+      user,
+      tokenHash,
+      expiresAt,
+    });
+
+    await this.passwordResetTokensRepository.save(tokenRecord);
+
+    try {
+      // Send email with reset link
+      await this.passwordResetMailService.sendResetPasswordEmail(user, resetToken);
+      this.logger.log(`Password reset email queued for user ${user.id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown email error';
+      this.logger.error(`Password reset email failed for user ${user.id}: ${message}`);
+    }
+
+    return { message: 'If that email exists, you will receive a password reset link' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const tokenHash = this.hashToken(token);
+
+    const tokenRecord = await this.passwordResetTokensRepository.findOne({
+      where: {
+        tokenHash,
+        usedAt: IsNull(),
+      },
+      relations: ['user'],
+    });
+
+    if (!tokenRecord) {
+      this.logger.warn('Password reset failed: invalid token');
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    // Check if token is still valid (1 hour expiry)
+    if (tokenRecord.expiresAt <= new Date()) {
+      this.logger.warn(`Password reset failed: expired token for user ${tokenRecord.user.id}`);
+      throw new BadRequestException('Password reset token has expired');
+    }
+
+    // Update user password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    tokenRecord.user.passwordHash = passwordHash;
+    await this.usersRepository.save(tokenRecord.user);
+
+    // Mark token as used
+    tokenRecord.usedAt = new Date();
+    await this.passwordResetTokensRepository.save(tokenRecord);
+
+    // Optionally: revoke all active sessions after password reset
+    await this.refreshTokensRepository.update(
+      {
+        user: { id: tokenRecord.user.id },
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+      },
+    );
+
+    this.logger.log(`Password reset completed for user ${tokenRecord.user.id}`);
+
+    return { message: 'Password reset successfully' };
   }
 
   async me(userId: string) {
