@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { hasAccessToken } from '@/services/http'
+import DashboardView from '@/views/dashboard/DashboardView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -38,7 +39,7 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'dashboard',
-          component: () => import('@/views/dashboard/DashboardView.vue'),
+          component: DashboardView,
           meta: { title: 'Dashboard' },
         },
         {
