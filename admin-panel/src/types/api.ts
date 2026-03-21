@@ -369,16 +369,30 @@ export interface DashboardSalesTrendPoint {
 }
 
 export interface DashboardSalesInsights {
-  trendLast7Days: {
+  period: {
+    preset: '7d' | '30d' | 'month' | 'custom'
+    label: string
+    from: string
+    to: string
+    days: number
+  }
+  trend: {
     totalOrders: number
     totalRevenue: number
     points: DashboardSalesTrendPoint[]
   }
-  weekComparison: {
-    currentWeekRevenue: number
-    previousWeekRevenue: number
+  comparison: {
+    currentRevenue: number
+    previousRevenue: number
     deltaPercent: number | null
   }
+}
+
+export interface DashboardSummaryQuery {
+  salesPreset?: '7d' | '30d' | 'month' | 'custom'
+  month?: string
+  from?: string
+  to?: string
 }
 
 export interface DashboardSummary {

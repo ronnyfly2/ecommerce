@@ -27,7 +27,7 @@ describe('Dashboard Metrics', () => {
       },
     }).as('login')
 
-    cy.intercept('GET', '**/api/dashboard/summary', {
+    cy.intercept('GET', '**/api/dashboard/summary*', {
       statusCode: 200,
       body: {
         statusCode: 200,
@@ -43,7 +43,14 @@ describe('Dashboard Metrics', () => {
             cancelledOrders: 2,
           },
           sales: {
-            trendLast7Days: {
+            period: {
+              preset: '7d',
+              label: 'Ultimos 7 dias',
+              from: '2026-03-13',
+              to: '2026-03-19',
+              days: 7,
+            },
+            trend: {
               totalOrders: 18,
               totalRevenue: 54000,
               points: [
@@ -56,9 +63,9 @@ describe('Dashboard Metrics', () => {
                 { date: '2026-03-19', label: 'jue', orders: 3, revenue: 13800 },
               ],
             },
-            weekComparison: {
-              currentWeekRevenue: 54000,
-              previousWeekRevenue: 42000,
+            comparison: {
+              currentRevenue: 54000,
+              previousRevenue: 42000,
               deltaPercent: 28.57,
             },
           },
@@ -132,21 +139,35 @@ describe('Dashboard Metrics', () => {
     cy.url().should('include', '/dashboard')
 
     cy.wait('@login')
-    cy.wait('@dashboardSummary')
-    cy.wait('@ordersList')
   })
 
   it('renders sales summary and inventory alerts', () => {
+    cy.wait('@dashboardSummary')
+    cy.wait('@ordersList')
+
     cy.contains('Revenue total').should('be.visible')
-    cy.contains('Ventas (ultimos 7 dias)').should('be.visible')
+    cy.contains('Ventas').should('be.visible')
     cy.contains('Stock bajo').should('be.visible')
     cy.contains('Sin stock').should('be.visible')
     cy.contains('Variantes críticas').should('be.visible')
 
-    cy.contains('Esta semana').should('be.visible')
-    cy.contains('Semana anterior').should('be.visible')
-    cy.contains('Ordenes 7 dias').should('be.visible')
-    cy.contains('+28.57% vs semana anterior').should('be.visible')
+    cy.contains('Periodo actual').should('be.visible')
+    cy.contains('Periodo anterior').should('be.visible')
+    cy.contains('Ordenes del periodo').should('be.visible')
+    cy.contains('+28.57% vs periodo anterior').should('be.visible')
+    cy.contains('7 dias').should('be.visible')
+    cy.contains('30 dias').should('be.visible')
+    cy.contains('Por mes').should('be.visible')
+    cy.contains('Rango').should('be.visible')
+    cy.get('[data-test="sales-card-current"]').should('be.visible')
+    cy.get('[data-test="sales-card-previous"]').should('be.visible')
+    cy.get('[data-test="sales-card-orders"]').should('be.visible')
+
+    cy.contains('button', 'Rango').click()
+    cy.contains('button', 'Hoy').should('be.visible')
+    cy.contains('button', '7d').should('be.visible')
+    cy.contains('button', '14d').should('be.visible')
+    cy.contains('button', '30d').should('be.visible')
 
     cy.contains('Remera Basica').should('be.visible')
     cy.contains('TSHIRT-BLK-M').should('be.visible')

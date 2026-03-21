@@ -85,18 +85,24 @@ describe('Dashboard (e2e)', () => {
         );
         expect(body.data.sales).toEqual(
           expect.objectContaining({
-            trendLast7Days: expect.objectContaining({
+            period: expect.objectContaining({
+              preset: expect.any(String),
+              from: expect.any(String),
+              to: expect.any(String),
+              days: expect.any(Number),
+            }),
+            trend: expect.objectContaining({
               totalOrders: expect.any(Number),
               totalRevenue: expect.any(Number),
               points: expect.any(Array),
             }),
-            weekComparison: expect.objectContaining({
-              currentWeekRevenue: expect.any(Number),
-              previousWeekRevenue: expect.any(Number),
+            comparison: expect.objectContaining({
+              currentRevenue: expect.any(Number),
+              previousRevenue: expect.any(Number),
             }),
           }),
         );
-        expect(body.data.sales.trendLast7Days.points).toHaveLength(7);
+        expect(body.data.sales.trend.points).toHaveLength(7);
         expect(body.data.inventoryAlerts).toEqual(
           expect.objectContaining({
             threshold: expect.any(Number),
