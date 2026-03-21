@@ -14,6 +14,7 @@ defineProps<{
     :disabled="disabled || loading"
     :class="[
       'btn-base',
+      size === 'sm' ? '' : 'w-full sm:w-auto',
       variant === 'secondary' ? 'btn-secondary' :
       variant === 'danger'    ? 'btn-danger'    :
       variant === 'ghost'     ? 'btn-ghost'     :

@@ -10,7 +10,6 @@ import { DashboardSalesPreset, DashboardSummaryQueryDto } from './dto/dashboard-
 
 const LOW_STOCK_THRESHOLD = 5;
 const LOW_STOCK_VARIANTS_LIMIT = 5;
-const MAX_SALES_RANGE_DAYS = 92;
 
 @Injectable()
 export class DashboardService {
@@ -217,9 +216,6 @@ export class DashboardService {
       }
 
       const days = this.diffDaysInclusive(currentStart, currentEnd);
-      if (days > MAX_SALES_RANGE_DAYS) {
-        throw new BadRequestException(`Custom sales range max is ${MAX_SALES_RANGE_DAYS} days`);
-      }
 
       const previousEnd = this.addDays(currentStart, -1);
       const previousStart = this.addDays(previousEnd, -(days - 1));

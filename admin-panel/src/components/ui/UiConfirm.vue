@@ -40,12 +40,12 @@ defineEmits<{ confirm: []; cancel: [] }>()
               <p class="text-muted">{{ message ?? 'Esta acción no se puede deshacer.' }}</p>
             </div>
           </div>
-          <div class="flex gap-3 mt-6 justify-end">
-            <button class="btn-base btn-secondary" :disabled="loading" @click="$emit('cancel')">
+          <div class="mt-6 flex flex-col justify-end gap-3 sm:flex-row">
+            <button class="btn-base btn-secondary w-full sm:w-auto" :disabled="loading" @click="$emit('cancel')">
               {{ cancelLabel ?? 'Cancelar' }}
             </button>
             <button
-              :class="['btn-base', variant === 'warning' ? 'btn-secondary' : 'btn-danger']"
+              :class="['btn-base w-full sm:w-auto', variant === 'warning' ? 'btn-secondary' : 'btn-danger']"
               :disabled="loading"
               @click="$emit('confirm')"
             >

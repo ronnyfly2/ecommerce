@@ -50,7 +50,10 @@ defineEmits<{ close: [] }>()
             <slot />
           </div>
           <!-- Footer -->
-          <div v-if="$slots.footer" class="px-6 py-4 border-t border-[--color-surface-200] flex items-center justify-end gap-3">
+          <div
+            v-if="$slots.footer"
+            class="px-6 py-4 border-t border-[--color-surface-200] flex flex-col items-stretch justify-end gap-3 sm:flex-row sm:items-center [&>*]:w-full sm:[&>*]:w-auto"
+          >
             <slot name="footer" />
           </div>
         </div>

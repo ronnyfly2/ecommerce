@@ -37,7 +37,6 @@ const salesPreset = ref<SalesPreset>('7d')
 const salesMonth = ref(formatMonthInput(new Date()))
 const salesFrom = ref(formatDateInput(addDays(new Date(), -6)))
 const salesTo = ref(formatDateInput(new Date()))
-const todayInput = formatDateInput(new Date())
 
 const salesPresetOptions: Array<{ id: SalesPreset; label: string }> = [
   { id: '7d', label: '7 dias' },
@@ -116,12 +115,6 @@ const customRangeError = computed(() => {
   if (salesPreset.value !== 'custom') return ''
   if (!salesFrom.value || !salesTo.value) return 'Selecciona fecha desde y hasta'
   if (salesFrom.value > salesTo.value) return 'La fecha desde no puede ser mayor que hasta'
-
-  const from = new Date(salesFrom.value)
-  const to = new Date(salesTo.value)
-  const days = Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)) + 1
-
-  if (days > 92) return 'El rango maximo permitido es de 92 dias'
   return ''
 })
 
@@ -212,7 +205,6 @@ function applyQuickCustomRange(days: number) {
   const from = addDays(to, -(days - 1))
   salesFrom.value = formatDateInput(from)
   salesTo.value = formatDateInput(to)
-  void refreshSales()
 }
 
 function isQuickRangeActive(days: number) {
@@ -290,7 +282,7 @@ onMounted(async () => {
 
     <UiCard v-if="sales" title="Ventas">
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div>
+        <div class="min-w-0">
           <div class="mb-6 flex flex-col gap-4">
             <div class="flex flex-wrap items-center gap-3">
               <button
@@ -351,24 +343,21 @@ onMounted(async () => {
                 </button>
               </div>
 
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
+              <div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="min-w-0">
                   <label class="mb-3 block text-xs font-semibold uppercase tracking-[0.14em] text-[--color-surface-500]">Desde</label>
                   <input
                     v-model="salesFrom"
                     type="date"
-                    :max="salesTo || todayInput"
-                    class="input-base"
+                    class="input-base min-w-0 max-w-full"
                   >
                 </div>
-                <div>
+                <div class="min-w-0">
                   <label class="mb-3 block text-xs font-semibold uppercase tracking-[0.14em] text-[--color-surface-500]">Hasta</label>
                   <input
                     v-model="salesTo"
                     type="date"
-                    :min="salesFrom || undefined"
-                    :max="todayInput"
-                    class="input-base"
+                    class="input-base min-w-0 max-w-full"
                   >
                 </div>
               </div>
@@ -383,7 +372,7 @@ onMounted(async () => {
               <div class="mt-4 flex justify-end">
                 <button
                   type="button"
-                  class="rounded-xl px-4 py-2 text-sm font-semibold text-white transition"
+                  class="w-full rounded-xl px-4 py-2 text-sm font-semibold text-white transition sm:w-auto"
                   :class="canApplyCustomRange
                     ? 'bg-[--color-primary-600] hover:bg-[--color-primary-700]'
                     : 'cursor-not-allowed bg-[--color-surface-400]'"
@@ -425,7 +414,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="rounded-2xl border border-[--color-surface-200] bg-[--color-surface-50] px-4 py-6 sm:px-5 lg:px-6">
+        <div class="min-w-0 rounded-2xl border border-[--color-surface-200] bg-[--color-surface-50] px-4 py-6 sm:px-5 lg:px-6">
           <div class="space-y-4">
             <div class="rounded-2xl border border-[--color-surface-200] bg-white px-6 py-5" data-test="sales-card-current">
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-surface-500]">Periodo actual</p>
