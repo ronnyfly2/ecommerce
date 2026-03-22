@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ordersService } from '@/services/orders.service'
 import type { Order } from '@/types/api'
@@ -9,16 +9,22 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
+import UiEmptyState from '@/components/ui/UiEmptyState.vue'
 import { useToast } from '@/composables/useToast'
+import { formatMoney } from '@/utils/currency'
+import { getSystemCurrencyCode } from '@/utils/system-currency'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const auth = useAuthStore()
 
 const order = ref<Order | null>(null)
 const loading = ref(true)
 const updating = ref(false)
 const selectedStatus = ref<OrderStatus | ''>('')
+const canManageOrders = computed(() => auth.can('orders.manage'))
 
 const statusColor: Record<OrderStatus, 'neutral' | 'info' | 'primary' | 'success' | 'danger' | 'warning'> = {
   [OrderStatus.PENDING]: 'warning',
@@ -41,8 +47,8 @@ const statusOptions = Object.values(OrderStatus).map((status) => ({
   label: statusLabel[status],
 }))
 
-function fmt(n: string | number) {
-  return Number(n).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 })
+function fmt(n: string | number, currencyCode = order.value?.currencyCode || getSystemCurrencyCode()) {
+  return formatMoney(n, currencyCode)
 }
 
 async function load() {
@@ -94,7 +100,7 @@ onMounted(load)
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <UiCard class="lg:col-span-2" title="Items">
-        <div v-if="!order.items.length" class="text-muted text-center py-8">Sin ítems</div>
+        <UiEmptyState v-if="!order.items.length" title="Sin ítems" compact />
         <div v-else class="space-y-3">
           <div
             v-for="item in order.items"
@@ -109,7 +115,7 @@ onMounted(load)
               </div>
               <div class="text-right">
                 <p class="text-sm">x{{ item.quantity }}</p>
-                <p class="font-medium">{{ fmt(item.subtotal) }}</p>
+                <p class="font-medium">{{ fmt(item.subtotal, order.currencyCode) }}</p>
               </div>
             </div>
           </div>
@@ -131,29 +137,32 @@ onMounted(load)
           <div class="divider my-2" />
           <div class="flex justify-between">
             <span class="text-muted">Subtotal</span>
-            <span>{{ fmt(order.subtotal) }}</span>
+            <span>{{ fmt(order.subtotal, order.currencyCode) }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-muted">Descuento</span>
-            <span>- {{ fmt(order.discount) }}</span>
+            <span>- {{ fmt(order.discount, order.currencyCode) }}</span>
           </div>
           <div class="flex justify-between text-base font-semibold">
             <span>Total</span>
-            <span>{{ fmt(order.total) }}</span>
+            <span>{{ fmt(order.total, order.currencyCode) }}</span>
           </div>
         </div>
 
         <div class="divider my-4" />
 
-        <UiSelect
-          v-model="selectedStatus"
-          label="Cambiar estado"
-          :options="statusOptions"
-        />
+        <template v-if="canManageOrders">
+          <UiSelect
+            v-model="selectedStatus"
+            label="Cambiar estado"
+            :options="statusOptions"
+          />
 
-        <UiButton class="w-full mt-3" :loading="updating" @click="updateStatus">
-          Actualizar estado
-        </UiButton>
+          <UiButton class="w-full mt-3" :loading="updating" @click="updateStatus">
+            Actualizar estado
+          </UiButton>
+        </template>
+        <p v-else class="text-sm text-muted">Tu rol tiene acceso de lectura sobre la orden.</p>
       </UiCard>
     </div>
 

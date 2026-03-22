@@ -5,6 +5,7 @@ import { Size } from './sizes/entities/size.entity';
 import { Color } from './colors/entities/color.entity';
 import { Category } from './categories/entities/category.entity';
 import { Product } from './products/entities/product.entity';
+import { ProductRecommendation } from './products/entities/product-recommendation.entity';
 import { ProductVariant } from './products/entities/product-variant.entity';
 import { ProductImage } from './products/entities/product-image.entity';
 import { InventoryMovement } from './inventory/entities/inventory-movement.entity';
@@ -14,6 +15,9 @@ import { Order } from './orders/entities/order.entity';
 import { OrderItem } from './orders/entities/order-item.entity';
 import { ShippingAddress } from './orders/entities/shipping-address.entity';
 import { RefreshToken } from './auth/entities/refresh-token.entity';
+import { Tag } from './tags/entities/tag.entity';
+import { Currency } from './currencies/entities/currency.entity';
+import { Notification } from './notifications/entities/notification.entity';
 
 dotenv.config({ path: '.env' });
 
@@ -30,6 +34,7 @@ export const AppDataSource = new DataSource({
     Color,
     Category,
     Product,
+    ProductRecommendation,
     ProductVariant,
     ProductImage,
     InventoryMovement,
@@ -39,6 +44,9 @@ export const AppDataSource = new DataSource({
     OrderItem,
     ShippingAddress,
     RefreshToken,
+    Tag,
+    Currency,
+    Notification,
   ],
   migrations: ['src/migration/*.ts'],
   logging: false,

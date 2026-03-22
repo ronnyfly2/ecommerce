@@ -41,6 +41,9 @@ export type ApiListData<T> = T[] | ApiPaginatedData<T>
 export const Role = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN: 'ADMIN',
+  BOSS: 'BOSS',
+  MARKETING: 'MARKETING',
+  SALES: 'SALES',
   CUSTOMER: 'CUSTOMER',
 } as const
 export type Role = (typeof Role)[keyof typeof Role]
@@ -67,6 +70,13 @@ export const InventoryMovementType = {
   RETURN: 'RETURN',
 } as const
 export type InventoryMovementType = (typeof InventoryMovementType)[keyof typeof InventoryMovementType]
+
+export const NotificationType = {
+  USER_REGISTERED: 'USER_REGISTERED',
+  ORDER_CREATED: 'ORDER_CREATED',
+  ORDER_STATUS_CHANGED: 'ORDER_STATUS_CHANGED',
+} as const
+export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 
 // ----------------------------------------------------------
 // Auth
@@ -149,6 +159,41 @@ export interface QueryUsersDto {
   isActive?: boolean
 }
 
+export interface NotificationActor {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  role: Role
+  avatar: string | null
+}
+
+export interface Notification {
+  id: string
+  type: NotificationType
+  title: string
+  message: string
+  link: string | null
+  metadata: Record<string, unknown> | null
+  isRead: boolean
+  readAt: string | null
+  createdAt: string
+  actorUser: NotificationActor | null
+}
+
+export interface QueryNotificationsDto {
+  page?: number
+  limit?: number
+  unreadOnly?: boolean
+  type?: NotificationType
+}
+
+export interface NotificationListData {
+  items: Notification[]
+  meta: ApiPaginationMeta
+  unreadCount: number
+}
+
 // ----------------------------------------------------------
 // Categories
 // ----------------------------------------------------------
@@ -176,17 +221,62 @@ export interface CreateCategoryDto {
 }
 
 // ----------------------------------------------------------
+// Currencies
+// ----------------------------------------------------------
+export interface Currency {
+  id: string
+  code: string
+  name: string
+  symbol: string
+  exchangeRateToUsd: string
+  isActive: boolean
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateCurrencyDto {
+  code: string
+  name: string
+  symbol: string
+  exchangeRateToUsd: number
+  isActive?: boolean
+  isDefault?: boolean
+}
+
+// ----------------------------------------------------------
 // Sizes
 // ----------------------------------------------------------
 export interface Size {
   id: string
   name: string
+  abbreviation: string
+  displayOrder: number
   createdAt: string
   updatedAt: string
 }
 
 export interface CreateSizeDto {
   name: string
+  abbreviation: string
+  displayOrder?: number
+}
+
+// ----------------------------------------------------------
+// Tags
+// ----------------------------------------------------------
+export interface Tag {
+  id: string
+  name: string
+  slug: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateTagDto {
+  name: string
+  isActive?: boolean
 }
 
 // ----------------------------------------------------------
@@ -245,10 +335,20 @@ export interface ProductVariant {
 export interface Product {
   id: string
   name: string
+  sku: string
   slug: string
   description: string | null
   basePrice: string
+  currencyCode: string
+  hasOffer: boolean
+  offerPrice: string | null
+  offerPercentage: string | null
   category: Category
+  coupon: Coupon | null
+  couponLink: string | null
+  tags: Tag[]
+  relatedProducts: Product[]
+  suggestedProducts: Product[]
   isActive: boolean
   isFeatured: boolean
   variants: ProductVariant[]
@@ -259,11 +359,21 @@ export interface Product {
 
 export interface CreateProductDto {
   name: string
+  sku: string
   description?: string
   basePrice: number
+  currencyCode?: string
   categoryId: string
+  couponId?: string
+  couponLink?: string
+  tagIds?: string[]
+  relatedProductIds?: string[]
+  suggestedProductIds?: string[]
   isActive?: boolean
   isFeatured?: boolean
+  hasOffer?: boolean
+  offerPrice?: number
+  offerPercentage?: number
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}
@@ -282,7 +392,11 @@ export interface QueryProductsDto {
   limit?: number
   search?: string
   categoryId?: string
+  tagId?: string
+  couponId?: string
+  currencyCode?: string
   isActive?: boolean
+  hasOffer?: boolean
 }
 
 // ----------------------------------------------------------
@@ -317,6 +431,8 @@ export interface Order {
   subtotal: string
   discount: string
   total: string
+  currencyCode: string
+  exchangeRateToUsd: string
   coupon: Coupon | null
   items: OrderItem[]
   shippingAddresses: ShippingAddress[]
@@ -333,6 +449,7 @@ export interface QueryOrdersDto {
   page?: number
   limit?: number
   status?: OrderStatus
+  currencyCode?: string
 }
 
 export interface OrderStats {
@@ -410,6 +527,7 @@ export interface Coupon {
   type: CouponType
   value: string
   minOrderAmount: string
+  currencyCode: string
   maxUsage: number | null
   usageCount: number
   startDate: string | null
@@ -424,6 +542,7 @@ export interface CreateCouponDto {
   type: CouponType
   value: string
   minOrderAmount?: string
+  currencyCode?: string
   maxUsage?: number
   startDate?: string
   endDate?: string

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { categoriesService } from '@/services/catalog.service'
 import { extractErrorMessage } from '@/utils/error'
 import type { Category } from '@/types/api'
@@ -11,11 +11,13 @@ import UiModal from '@/components/ui/UiModal.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiTable from '@/components/ui/UiTable.vue'
+import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormToggleField from '@/components/forms/FormToggleField.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
-const categories = ref<Category[]>([])
-const loading = ref(false)
+const categories = ref<Category[] | null>(null)
+const tableLoading = computed(() => categories.value === null)
 
 const formModal = reactive({
   show: false,
@@ -33,13 +35,12 @@ const formModal = reactive({
 const confirm = reactive({ show: false, id: '', name: '', loading: false })
 
 async function load() {
-  loading.value = true
+  categories.value = null
   try {
     categories.value = await categoriesService.list()
   } catch {
+    categories.value = []
     toast.error('Error', 'No se pudieron cargar las categorías')
-  } finally {
-    loading.value = false
   }
 }
 
@@ -130,7 +131,7 @@ onMounted(load)
     </div>
 
     <UiCard :padding="false">
-      <UiTable :loading="loading" :empty="!loading && !categories.length" empty-message="No hay categorías">
+      <UiTable :data="categories" :loading="tableLoading" loading-color="primary" loading-text="Cargando categorías..." empty-message="No hay categorías">
         <template #head>
           <tr>
             <th class="table-th">Nombre</th>
@@ -141,7 +142,7 @@ onMounted(load)
           </tr>
         </template>
 
-        <tr v-for="c in categories" :key="c.id" class="table-tr-hover">
+        <tr v-for="c in categories ?? []" :key="c.id" class="table-tr-hover">
           <td class="table-td">
             <div class="font-medium">{{ c.name }}</div>
             <div class="text-xs text-muted">{{ c.slug }}</div>
@@ -171,10 +172,7 @@ onMounted(load)
         <UiInput v-model="formModal.image" label="Imagen (URL)" class="md:col-span-2" />
         <UiInput v-model="formModal.displayOrder" type="number" min="0" label="Orden de visualización" />
         <div class="flex items-center pt-7">
-          <label class="flex items-center gap-2 text-sm text-[--color-surface-700]">
-            <input v-model="formModal.isActive" type="checkbox" class="accent-[--color-primary-600]" />
-            Activa
-          </label>
+          <FormToggleField v-model="formModal.isActive" label="Activa" />
         </div>
         <div class="md:col-span-2">
           <UiInput
@@ -190,8 +188,7 @@ onMounted(load)
       </div>
 
       <template #footer>
-        <UiButton variant="secondary" @click="formModal.show = false">Cancelar</UiButton>
-        <UiButton :loading="formModal.loading" @click="saveCategory">Guardar</UiButton>
+        <FormModalActions :loading="formModal.loading" @cancel="formModal.show = false" @save="saveCategory" />
       </template>
     </UiModal>
 

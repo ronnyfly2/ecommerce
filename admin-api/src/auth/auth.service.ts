@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'crypto';
 import ms, { StringValue } from 'ms';
 import { IsNull, Repository } from 'typeorm';
 import { Role } from '../common/enums/role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -35,6 +36,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly passwordResetMailService: PasswordResetMailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto, requestContext: AuthRequestContext) {
@@ -57,6 +59,7 @@ export class AuthService {
     });
 
     const savedUser = await this.usersRepository.save(user);
+    await this.notificationsService.notifyUserRegistered(savedUser);
 
     return this.buildAuthResponse(savedUser, requestContext);
   }

@@ -29,6 +29,11 @@ export class CreateCouponDto {
   @IsDecimal()
   minOrderAmount?: string;
 
+  @ApiPropertyOptional({ example: 'USD', default: 'USD' })
+  @IsOptional()
+  @IsString()
+  currencyCode?: string;
+
   @ApiPropertyOptional({ example: 100 })
   @IsOptional()
   @IsInt()

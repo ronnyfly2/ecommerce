@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, reactive, watch, onMounted } from 'vue'
+import { computed, ref, reactive, watch, onMounted, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ordersService } from '@/services/orders.service'
+import { currenciesService } from '@/services/currencies.service'
 import type { Order } from '@/types/api'
+import type { Currency } from '@/types/api'
 import { OrderStatus } from '@/types/api'
 import { usePagination } from '@/composables/usePagination'
 import { useToast } from '@/composables/useToast'
 import { normalizeApiList } from '@/utils/api-list'
+import { formatMoney } from '@/utils/currency'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiTable from '@/components/ui/UiTable.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
@@ -14,23 +17,28 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
 import UiSortHeader from '@/components/ui/UiSortHeader.vue'
+import { getSystemCurrencyCode } from '@/utils/system-currency'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const pg = usePagination(15)
 
-const orders = ref<Order[]>([])
-const loading = ref(false)
-const filters = reactive<{ status: '' | OrderStatus }>({ status: '' })
+const orders = ref<Order[] | null>(null)
+const currencies = ref<Currency[]>([])
+const filters = reactive<{ status: '' | OrderStatus; currencyCode: string }>({ status: '', currencyCode: '' })
 const initialized = ref(false)
 const sortBy = ref<'createdAt' | 'total'>('createdAt')
 const sortDir = ref<'asc' | 'desc'>('desc')
+const tableLoading = computed(() => orders.value === null)
+const statusFilter = toRef(filters, 'status')
+const currencyCodeFilter = toRef(filters, 'currencyCode')
 
 function syncQuery() {
   const query: Record<string, string> = {}
   if (pg.page.value > 1) query.page = String(pg.page.value)
   if (filters.status) query.status = filters.status
+  if (filters.currencyCode) query.currencyCode = filters.currencyCode
   router.replace({ query })
 }
 
@@ -55,35 +63,39 @@ const statusOptions = [
   ...Object.values(OrderStatus).map((status) => ({ value: status, label: statusLabel[status] })),
 ]
 
-function fmt(n: string | number) {
-  return Number(n).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 })
+function fmt(n: string | number, currencyCode = getSystemCurrencyCode()) {
+  return formatMoney(n, currencyCode)
 }
 
 async function load() {
-  loading.value = true
+  orders.value = null
   try {
     const data = await ordersService.list({
       page: pg.page.value,
       limit: pg.limit.value,
       status: filters.status || undefined,
+      currencyCode: filters.currencyCode || undefined,
     })
     const result = normalizeApiList(data)
     orders.value = result.items
     pg.total.value = result.total
   } catch {
+    orders.value = []
     toast.error('Error', 'No se pudieron cargar las órdenes')
-  } finally {
-    loading.value = false
   }
 }
 
 const displayedOrders = computed(() => {
-  const list = [...orders.value]
+  const list = [...(orders.value ?? [])]
   return list.sort((a, b) => {
     const factor = sortDir.value === 'asc' ? 1 : -1
 
     if (sortBy.value === 'total') {
-      return (Number(a.total) - Number(b.total)) * factor
+      const aRate = Number(a.exchangeRateToUsd || 1)
+      const bRate = Number(b.exchangeRateToUsd || 1)
+      const aUsd = Number(a.total) / aRate
+      const bUsd = Number(b.total) / bRate
+      return (aUsd - bUsd) * factor
     }
 
     const aTime = new Date(a.createdAt).getTime()
@@ -91,6 +103,7 @@ const displayedOrders = computed(() => {
     return (aTime - bTime) * factor
   })
 })
+const tableEmpty = computed(() => !tableLoading.value && displayedOrders.value.length === 0)
 
 function toggleSort(column: 'createdAt' | 'total') {
   if (sortBy.value === column) {
@@ -102,7 +115,7 @@ function toggleSort(column: 'createdAt' | 'total') {
   sortDir.value = 'desc'
 }
 
-watch([() => pg.page.value, () => filters.status], async () => {
+watch([pg.page, statusFilter, currencyCodeFilter], async () => {
   if (!initialized.value) return
   syncQuery()
   await load()
@@ -117,6 +130,17 @@ onMounted(async () => {
     filters.status = status as OrderStatus
   }
 
+  if (typeof route.query.currencyCode === 'string') {
+    filters.currencyCode = route.query.currencyCode
+  }
+
+  try {
+    const list = await currenciesService.list()
+    currencies.value = list.filter((item) => item.isActive)
+  } catch {
+    currencies.value = []
+  }
+
   initialized.value = true
   await load()
 })
@@ -128,17 +152,29 @@ onMounted(async () => {
       <UiSelect
         v-model="filters.status"
         :options="statusOptions"
-        class="min-w-[220px]"
+        class="min-w-55"
+      />
+      <UiSelect
+        v-model="filters.currencyCode"
+        :options="[
+          { value: '', label: 'Todas las monedas' },
+          ...currencies.map((currency) => ({
+            value: currency.code,
+            label: `${currency.code} (${currency.symbol})`,
+          })),
+        ]"
+        class="min-w-55"
       />
     </div>
 
     <UiCard :padding="false">
-      <UiTable :loading="loading" :empty="!loading && !orders.length" empty-message="No hay órdenes">
+      <UiTable :data="displayedOrders" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando órdenes..." empty-message="No hay órdenes">
         <template #head>
           <tr>
             <th class="table-th">ID</th>
             <th class="table-th">Cliente</th>
             <th class="table-th">Estado</th>
+            <th class="table-th">Moneda</th>
             <th class="table-th text-right">
               <UiSortHeader
                 label="Total"
@@ -165,7 +201,8 @@ onMounted(async () => {
           <td class="table-td">
             <UiBadge :color="statusColor[o.status]" dot>{{ statusLabel[o.status] }}</UiBadge>
           </td>
-          <td class="table-td text-right font-medium">{{ fmt(o.total) }}</td>
+          <td class="table-td text-muted text-xs">{{ o.currencyCode }}</td>
+          <td class="table-td text-right font-medium">{{ fmt(o.total, o.currencyCode) }}</td>
           <td class="table-td text-muted text-xs">{{ new Date(o.createdAt).toLocaleDateString('es-AR') }}</td>
           <td class="table-td table-actions-td text-right">
             <UiButton size="sm" variant="ghost" @click="router.push({ name: 'orders-detail', params: { id: o.id } })">
@@ -175,7 +212,7 @@ onMounted(async () => {
         </tr>
 
         <template #empty-actions>
-          <UiButton size="sm" @click="filters.status = ''">Limpiar filtros</UiButton>
+          <UiButton size="sm" @click="filters.status = ''; filters.currencyCode = ''">Limpiar filtros</UiButton>
         </template>
       </UiTable>
 

@@ -393,7 +393,6 @@ body {
 
 @utility table-base {
   width: 100%;
-  min-width: 720px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: var(--text-sm);
@@ -438,6 +437,22 @@ body {
   box-shadow: -10px 0 14px -14px rgb(15 23 42 / 28%);
 }
 
+.table-base-compact {
+}
+
+.table-base-compact .table-th,
+.table-base-compact .table-td {
+  padding: var(--spacing-2) var(--spacing-3);
+}
+
+.table-base-compact .table-th {
+  font-size: 0.6875rem;
+}
+
+.table-base-compact .table-td {
+  font-size: var(--text-xs);
+}
+
 @utility table-tr-hover {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 
@@ -469,10 +484,6 @@ body {
 }
 
 @media (max-width: 768px) {
-  .table-base {
-    min-width: 640px;
-  }
-
   .table-th,
   .table-td {
     padding: var(--spacing-2) var(--spacing-3);

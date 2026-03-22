@@ -1,7 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { hasAccessToken } from '@/services/http'
+import type { Role } from '@/types/api'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
+import { preloadRichEditor } from '@/utils/preload-rich-editor'
+import {
+  BACKOFFICE_ROLES,
+  CATALOG_MANAGE_ROLES,
+  COUPON_READ_ROLES,
+  CURRENCY_MANAGE_ROLES,
+  INVENTORY_READ_ROLES,
+  ORDER_READ_ROLES,
+  PRODUCT_MANAGE_ROLES,
+  PRODUCT_READ_ROLES,
+  USER_READ_ROLES,
+} from '@/utils/permissions'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -40,13 +53,13 @@ const router = createRouter({
           path: 'dashboard',
           name: 'dashboard',
           component: DashboardView,
-          meta: { title: 'Dashboard' },
+          meta: { title: 'Dashboard', roles: BACKOFFICE_ROLES },
         },
         {
           path: 'profile',
           name: 'profile',
           component: () => import('@/views/auth/ProfileView.vue'),
-          meta: { title: 'Perfil y Sesiones' },
+          meta: { title: 'Perfil y Sesiones', roles: BACKOFFICE_ROLES },
         },
 
         // Productos
@@ -54,25 +67,25 @@ const router = createRouter({
           path: 'products',
           name: 'products',
           component: () => import('@/views/products/ProductsView.vue'),
-          meta: { title: 'Productos' },
+          meta: { title: 'Productos', roles: PRODUCT_READ_ROLES },
         },
         {
           path: 'products/new',
           name: 'products-new',
           component: () => import('@/views/products/ProductFormView.vue'),
-          meta: { title: 'Nuevo Producto' },
+          meta: { title: 'Nuevo Producto', roles: PRODUCT_MANAGE_ROLES },
         },
         {
           path: 'products/:id',
           name: 'products-detail',
           component: () => import('@/views/products/ProductDetailView.vue'),
-          meta: { title: 'Detalle de Producto' },
+          meta: { title: 'Detalle de Producto', roles: PRODUCT_READ_ROLES },
         },
         {
           path: 'products/:id/edit',
           name: 'products-edit',
           component: () => import('@/views/products/ProductFormView.vue'),
-          meta: { title: 'Editar Producto' },
+          meta: { title: 'Editar Producto', roles: PRODUCT_MANAGE_ROLES },
         },
 
         // Órdenes
@@ -80,13 +93,19 @@ const router = createRouter({
           path: 'orders',
           name: 'orders',
           component: () => import('@/views/orders/OrdersView.vue'),
-          meta: { title: 'Órdenes' },
+          meta: { title: 'Órdenes', roles: ORDER_READ_ROLES },
         },
         {
           path: 'orders/:id',
           name: 'orders-detail',
           component: () => import('@/views/orders/OrderDetailView.vue'),
-          meta: { title: 'Detalle de Orden' },
+          meta: { title: 'Detalle de Orden', roles: ORDER_READ_ROLES },
+        },
+        {
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('@/views/notifications/NotificationsView.vue'),
+          meta: { title: 'Notificaciones', roles: BACKOFFICE_ROLES },
         },
 
         // Cupones
@@ -94,7 +113,7 @@ const router = createRouter({
           path: 'coupons',
           name: 'coupons',
           component: () => import('@/views/coupons/CouponsView.vue'),
-          meta: { title: 'Cupones' },
+          meta: { title: 'Cupones', roles: COUPON_READ_ROLES },
         },
 
         // Usuarios
@@ -102,7 +121,7 @@ const router = createRouter({
           path: 'users',
           name: 'users',
           component: () => import('@/views/users/UsersView.vue'),
-          meta: { title: 'Usuarios', roles: ['ADMIN', 'SUPER_ADMIN'] },
+          meta: { title: 'Usuarios', roles: USER_READ_ROLES },
         },
 
         // Inventario
@@ -110,7 +129,7 @@ const router = createRouter({
           path: 'inventory',
           name: 'inventory',
           component: () => import('@/views/inventory/InventoryView.vue'),
-          meta: { title: 'Inventario' },
+          meta: { title: 'Inventario', roles: INVENTORY_READ_ROLES },
         },
 
         // Catálogo auxiliar
@@ -118,20 +137,32 @@ const router = createRouter({
           path: 'categories',
           name: 'categories',
           component: () => import('@/views/categories/CategoriesView.vue'),
-          meta: { title: 'Categorías' },
+          meta: { title: 'Categorías', roles: CATALOG_MANAGE_ROLES },
         },
         {
           path: 'sizes',
           name: 'sizes',
           component: () => import('@/views/sizes/SizesView.vue'),
-          meta: { title: 'Tallas' },
+          meta: { title: 'Tallas', roles: CATALOG_MANAGE_ROLES },
         },
         {
           path: 'colors',
           name: 'colors',
           component: () => import('@/views/colors/ColorsView.vue'),
-          meta: { title: 'Colores' },
+          meta: { title: 'Colores', roles: CATALOG_MANAGE_ROLES },
         },
+        {
+          path: 'currencies',
+          name: 'currencies',
+          component: () => import('@/views/currencies/CurrenciesView.vue'),
+          meta: { title: 'Tipo de moneda', roles: CURRENCY_MANAGE_ROLES },
+        },
+          {
+            path: 'tags',
+            name: 'tags',
+            component: () => import('@/views/tags/TagsView.vue'),
+            meta: { title: 'Tags', roles: CATALOG_MANAGE_ROLES },
+          },
       ],
     },
 
@@ -162,9 +193,18 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
+  const requiredRoles = to.meta.roles as readonly Role[] | undefined
+  if (!isPublicRoute && requiredRoles && !auth.canAccessRoles(requiredRoles)) {
+    return { name: 'dashboard' }
+  }
+
   const authPublicPages = new Set(['login', 'forgot-password', 'reset-password'])
   if (to.name && authPublicPages.has(String(to.name)) && auth.isAuthenticated) {
     return { name: 'dashboard' }
+  }
+
+  if (to.name === 'products-new' || to.name === 'products-edit') {
+    await preloadRichEditor()
   }
 })
 

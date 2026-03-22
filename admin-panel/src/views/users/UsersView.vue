@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted, computed, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usersService } from '@/services/users.service'
 import { Role } from '@/types/api'
@@ -16,17 +16,26 @@ import UiSelect from '@/components/ui/UiSelect.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
+import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormToggleField from '@/components/forms/FormToggleField.vue'
 import type { CreateUserDto, UpdateUserDto } from '@/types/api'
+import { useAuthStore } from '@/stores/auth'
 
 const toast = useToast()
 const pg = usePagination(15)
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 
-const users = ref<User[]>([])
-const loading = ref(false)
+const users = ref<User[] | null>(null)
 const filters = reactive({ search: '', role: '' as '' | Role, isActive: '' as '' | 'true' | 'false' })
 const initialized = ref(false)
+const tableLoading = computed(() => users.value === null)
+const canManageUsers = computed(() => auth.can('users.manage'))
+const canDeleteUsers = computed(() => auth.can('users.delete'))
+const searchFilter = toRef(filters, 'search')
+const roleFilter = toRef(filters, 'role')
+const isActiveFilter = toRef(filters, 'isActive')
 
 function syncQuery() {
   const query: Record<string, string> = {}
@@ -56,7 +65,9 @@ const roleOptions = [
   { value: '', label: 'Todos los roles' },
   { value: Role.SUPER_ADMIN, label: 'Super Admin' },
   { value: Role.ADMIN, label: 'Admin' },
-  { value: Role.CUSTOMER, label: 'Customer' },
+  { value: Role.BOSS, label: 'Boss' },
+  { value: Role.MARKETING, label: 'Marketing' },
+  { value: Role.SALES, label: 'Sales' },
 ]
 
 const activeOptions = [
@@ -66,7 +77,7 @@ const activeOptions = [
 ]
 
 async function load() {
-  loading.value = true
+  users.value = null
   try {
     const data = await usersService.list({
       page: pg.page.value,
@@ -79,13 +90,12 @@ async function load() {
     users.value = result.items
     pg.total.value = result.total
   } catch {
+    users.value = []
     toast.error('Error', 'No se pudieron cargar los usuarios')
-  } finally {
-    loading.value = false
   }
 }
 
-watch([() => pg.page.value, () => filters.search, () => filters.role, () => filters.isActive], async () => {
+watch([pg.page, searchFilter, roleFilter, isActiveFilter], async () => {
   if (!initialized.value) return
   syncQuery()
   await load()
@@ -211,11 +221,11 @@ async function removeUser() {
   <div class="space-y-4">
     <div class="flex flex-col xl:flex-row gap-3 xl:items-center xl:justify-between">
       <div class="flex flex-wrap gap-3">
-        <UiInput v-model="filters.search" placeholder="Buscar por email o nombre…" class="min-w-[240px]" />
-        <UiSelect v-model="filters.role" :options="roleOptions" class="min-w-[180px]" />
-        <UiSelect v-model="filters.isActive" :options="activeOptions" class="min-w-[160px]" />
+        <UiInput v-model="filters.search" placeholder="Buscar por email o nombre…" class="min-w-60" />
+        <UiSelect v-model="filters.role" :options="roleOptions" class="min-w-45" />
+        <UiSelect v-model="filters.isActive" :options="activeOptions" class="min-w-40" />
       </div>
-      <UiButton @click="openCreate">
+      <UiButton v-if="canManageUsers" @click="openCreate">
         <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>
@@ -224,7 +234,7 @@ async function removeUser() {
     </div>
 
     <UiCard :padding="false">
-      <UiTable :loading="loading" :empty="!loading && !users.length" empty-message="No hay usuarios">
+      <UiTable :data="users" :loading="tableLoading" loading-color="primary" loading-text="Cargando usuarios..." empty-message="No hay usuarios">
         <template #head>
           <tr>
             <th class="table-th">Usuario</th>
@@ -236,7 +246,7 @@ async function removeUser() {
           </tr>
         </template>
 
-        <tr v-for="u in users" :key="u.id" class="table-tr-hover">
+        <tr v-for="u in users ?? []" :key="u.id" class="table-tr-hover">
           <td class="table-td font-medium">{{ u.email }}</td>
           <td class="table-td">{{ [u.firstName, u.lastName].filter(Boolean).join(' ') || '—' }}</td>
           <td class="table-td text-center">
@@ -251,9 +261,9 @@ async function removeUser() {
           </td>
           <td class="table-td text-muted text-xs">{{ new Date(u.createdAt).toLocaleDateString('es-AR') }}</td>
           <td class="table-td table-actions-td text-right">
-            <div class="flex items-center gap-2 justify-end">
-              <UiButton variant="ghost" size="sm" @click="openEdit(u)">Editar</UiButton>
-              <UiButton variant="danger" size="sm" @click="askDelete(u)">Eliminar</UiButton>
+            <div v-if="canManageUsers || canDeleteUsers" class="flex items-center gap-2 justify-end">
+              <UiButton v-if="canManageUsers" variant="ghost" size="sm" @click="openEdit(u)">Editar</UiButton>
+              <UiButton v-if="canDeleteUsers" variant="danger" size="sm" @click="askDelete(u)">Eliminar</UiButton>
             </div>
           </td>
         </tr>
@@ -280,6 +290,7 @@ async function removeUser() {
     </UiCard>
 
     <UiModal
+      v-if="canManageUsers"
       :show="formModal.show"
       :title="formModal.isEdit ? 'Editar usuario' : 'Nuevo usuario'"
       size="md"
@@ -302,20 +313,17 @@ async function removeUser() {
           :options="roleOptions.filter(opt => opt.value !== '')"
         />
         <div class="flex items-center pt-7">
-          <label class="flex items-center gap-2 text-sm text-[--color-surface-700]">
-            <input v-model="formModal.isActive" type="checkbox" class="accent-[--color-primary-600]" />
-            Activo
-          </label>
+          <FormToggleField v-model="formModal.isActive" label="Activo" />
         </div>
       </div>
 
       <template #footer>
-        <UiButton variant="secondary" @click="formModal.show = false">Cancelar</UiButton>
-        <UiButton :loading="formModal.loading" @click="saveUser">Guardar</UiButton>
+        <FormModalActions :loading="formModal.loading" @cancel="formModal.show = false" @save="saveUser" />
       </template>
     </UiModal>
 
     <UiConfirm
+      v-if="canDeleteUsers"
       :show="confirm.show"
       title="Eliminar usuario"
       :message="`¿Eliminar el usuario ${confirm.name}?`"

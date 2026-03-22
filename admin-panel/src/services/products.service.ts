@@ -24,6 +24,13 @@ export const productsService = {
     return res.data.data
   },
 
+  async getRecommendations(id: string) {
+    const res = await http.get<ApiResponse<{ product: Pick<Product, 'id' | 'name' | 'sku'>; relatedProducts: Product[]; suggestedProducts: Product[] }>>(
+      `/products/${id}/recommendations`,
+    )
+    return res.data.data
+  },
+
   async create(dto: CreateProductDto) {
     const res = await http.post<ApiResponse<Product>>('/products', dto)
     return res.data.data

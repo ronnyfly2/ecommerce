@@ -4,10 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Category } from '../categories/entities/category.entity';
 import { Color } from '../colors/entities/color.entity';
+import { Coupon } from '../coupons/entities/coupon.entity';
+import { CurrenciesService } from '../currencies/currencies.service';
 import { Size } from '../sizes/entities/size.entity';
+import { Tag } from '../tags/entities/tag.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateProductImageDto } from './dto/create-product-image.dto';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
@@ -16,6 +19,10 @@ import { UpdateProductImageDto } from './dto/update-product-image.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { ProductImage } from './entities/product-image.entity';
+import {
+  ProductRecommendation,
+  ProductRecommendationType,
+} from './entities/product-recommendation.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { Product } from './entities/product.entity';
 
@@ -28,12 +35,19 @@ export class ProductsService {
     private readonly variantsRepository: Repository<ProductVariant>,
     @InjectRepository(ProductImage)
     private readonly imagesRepository: Repository<ProductImage>,
+    @InjectRepository(ProductRecommendation)
+    private readonly recommendationsRepository: Repository<ProductRecommendation>,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
     @InjectRepository(Size)
     private readonly sizesRepository: Repository<Size>,
     @InjectRepository(Color)
     private readonly colorsRepository: Repository<Color>,
+    @InjectRepository(Coupon)
+    private readonly couponsRepository: Repository<Coupon>,
+    @InjectRepository(Tag)
+    private readonly tagsRepository: Repository<Tag>,
+    private readonly currenciesService: CurrenciesService,
   ) {}
 
   async create(dto: CreateProductDto) {
@@ -45,19 +59,46 @@ export class ProductsService {
       throw new NotFoundException('Category not found');
     }
 
+    const normalizedSku = this.normalizeSku(dto.sku);
+    await this.ensureProductSkuAvailable(normalizedSku);
+
     const slug = await this.generateUniqueSlug(dto.name);
+    const currencyCode = await this.resolveCurrencyCode(dto.currencyCode);
+    const tags = await this.resolveTags(dto.tagIds);
+    const coupon = await this.resolveCoupon(dto.couponId);
+    const offer = this.normalizeOfferFields(
+      dto.basePrice,
+      dto.hasOffer,
+      dto.offerPrice,
+      dto.offerPercentage,
+    );
 
     const product = this.productsRepository.create({
       name: dto.name,
+      sku: normalizedSku,
       slug,
       description: dto.description ?? null,
       basePrice: dto.basePrice.toFixed(2),
+      currencyCode,
       category,
+      coupon,
+      couponLink: dto.couponLink?.trim() || null,
       isActive: dto.isActive ?? true,
       isFeatured: dto.isFeatured ?? false,
+      hasOffer: offer.hasOffer,
+      offerPrice: offer.offerPrice,
+      offerPercentage: offer.offerPercentage,
+      tags,
     });
 
-    return this.productsRepository.save(product);
+    const savedProduct = await this.productsRepository.save(product);
+
+    await this.syncRecommendations(savedProduct.id, {
+      relatedProductIds: dto.relatedProductIds,
+      suggestedProductIds: dto.suggestedProductIds,
+    });
+
+    return this.findOne(savedProduct.id);
   }
 
   async findAll(query: QueryProductsDto) {
@@ -65,34 +106,53 @@ export class ProductsService {
     const limit = Math.min(query.limit ?? 10, 100);
     const skip = (page - 1) * limit;
 
-    const where: FindOptionsWhere<Product> = {};
+    const qb = this.productsRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.variants', 'variant')
+      .leftJoinAndSelect('variant.size', 'size')
+      .leftJoinAndSelect('variant.color', 'color')
+      .leftJoinAndSelect('product.images', 'image')
+      .leftJoinAndSelect('product.coupon', 'coupon')
+      .leftJoinAndSelect('product.tags', 'tag')
+      .orderBy('product.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .distinct(true);
 
     if (query.search) {
-      where.name = ILike(`%${query.search}%`);
+      qb.andWhere('(product.name ILIKE :search OR product.sku ILIKE :search)', {
+        search: `%${query.search}%`,
+      });
     }
 
     if (query.categoryId) {
-      where.category = { id: query.categoryId } as Category;
+      qb.andWhere('product.category_id = :categoryId', { categoryId: query.categoryId });
+    }
+
+    if (query.tagId) {
+      qb.andWhere('tag.id = :tagId', { tagId: query.tagId });
     }
 
     if (query.isActive !== undefined) {
-      where.isActive = query.isActive;
+      qb.andWhere('product.is_active = :isActive', { isActive: query.isActive });
     }
 
-    const [items, total] = await this.productsRepository.findAndCount({
-      where,
-      relations: {
-        category: true,
-        variants: {
-          size: true,
-          color: true,
-        },
-        images: true,
-      },
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
-    });
+    if (query.hasOffer !== undefined) {
+      qb.andWhere('product.has_offer = :hasOffer', { hasOffer: query.hasOffer });
+    }
+
+    if (query.couponId) {
+      qb.andWhere('coupon.id = :couponId', { couponId: query.couponId });
+    }
+
+    if (query.currencyCode) {
+      qb.andWhere('product.currency_code = :currencyCode', {
+        currencyCode: this.normalizeCurrencyCode(query.currencyCode),
+      });
+    }
+
+    const [items, total] = await qb.getManyAndCount();
 
     return {
       items,
@@ -115,6 +175,14 @@ export class ProductsService {
           color: true,
         },
         images: true,
+        coupon: true,
+        tags: true,
+        recommendations: {
+          recommendedProduct: {
+            category: true,
+            images: true,
+          },
+        },
       },
     });
 
@@ -122,7 +190,21 @@ export class ProductsService {
       throw new NotFoundException('Product not found');
     }
 
-    return product;
+    return this.mapProductRecommendations(product);
+  }
+
+  async findRecommendations(id: string) {
+    const product = await this.findOne(id);
+
+    return {
+      product: {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+      },
+      relatedProducts: product.relatedProducts ?? [],
+      suggestedProducts: product.suggestedProducts ?? [],
+    };
   }
 
   async update(id: string, dto: UpdateProductDto) {
@@ -131,6 +213,12 @@ export class ProductsService {
     if (dto.name && dto.name !== product.name) {
       product.name = dto.name;
       product.slug = await this.generateUniqueSlug(dto.name, id);
+    }
+
+    if (dto.sku && this.normalizeSku(dto.sku) !== product.sku) {
+      const normalizedSku = this.normalizeSku(dto.sku);
+      await this.ensureProductSkuAvailable(normalizedSku, id);
+      product.sku = normalizedSku;
     }
 
     if (dto.categoryId) {
@@ -153,6 +241,10 @@ export class ProductsService {
       product.basePrice = dto.basePrice.toFixed(2);
     }
 
+    if (dto.currencyCode !== undefined) {
+      product.currencyCode = await this.resolveCurrencyCode(dto.currencyCode);
+    }
+
     if (dto.isActive !== undefined) {
       product.isActive = dto.isActive;
     }
@@ -161,7 +253,46 @@ export class ProductsService {
       product.isFeatured = dto.isFeatured;
     }
 
-    return this.productsRepository.save(product);
+    if (dto.tagIds !== undefined) {
+      product.tags = await this.resolveTags(dto.tagIds);
+    }
+
+    if (dto.couponId !== undefined) {
+      product.coupon = await this.resolveCoupon(dto.couponId);
+    }
+
+    if (dto.couponLink !== undefined) {
+      product.couponLink = dto.couponLink?.trim() || null;
+    }
+
+    const nextBasePrice = dto.basePrice !== undefined
+      ? dto.basePrice
+      : Number(product.basePrice);
+    const offer = this.normalizeOfferFields(
+      nextBasePrice,
+      dto.hasOffer ?? product.hasOffer,
+      dto.offerPrice,
+      dto.offerPercentage,
+      {
+        existingOfferPrice: product.offerPrice,
+        existingOfferPercentage: product.offerPercentage,
+      },
+    );
+
+    product.hasOffer = offer.hasOffer;
+    product.offerPrice = offer.offerPrice;
+    product.offerPercentage = offer.offerPercentage;
+
+    await this.productsRepository.save(product);
+
+    if (dto.relatedProductIds !== undefined || dto.suggestedProductIds !== undefined) {
+      await this.syncRecommendations(id, {
+        relatedProductIds: dto.relatedProductIds,
+        suggestedProductIds: dto.suggestedProductIds,
+      });
+    }
+
+    return this.findOne(id);
   }
 
   async remove(id: string) {
@@ -356,6 +487,226 @@ export class ProductsService {
 
     await this.imagesRepository.delete(imageId);
     return { deleted: true };
+  }
+
+  private async resolveTags(tagIds?: string[]) {
+    if (!tagIds || tagIds.length === 0) {
+      return [];
+    }
+
+    const uniqueTagIds = [...new Set(tagIds)];
+    const tags = await this.tagsRepository.find({
+      where: uniqueTagIds.map((id) => ({ id })),
+    });
+
+    if (tags.length !== uniqueTagIds.length) {
+      throw new NotFoundException('One or more tags were not found');
+    }
+
+    return tags;
+  }
+
+  private async resolveRecommendationProducts(
+    recommendationIds: string[] | undefined,
+    currentProductId: string,
+    label: 'related' | 'suggested',
+  ) {
+    if (!recommendationIds || recommendationIds.length === 0) {
+      return [];
+    }
+
+    const uniqueIds = [...new Set(recommendationIds)];
+
+    if (uniqueIds.some((id) => id === currentProductId)) {
+      throw new ConflictException('A product cannot be related to itself');
+    }
+
+    const products = await this.productsRepository.find({
+      where: uniqueIds.map((id) => ({ id })),
+    });
+
+    if (products.length !== uniqueIds.length) {
+      throw new NotFoundException(`One or more ${label} products were not found`);
+    }
+
+    return uniqueIds;
+  }
+
+  private async syncRecommendations(
+    productId: string,
+    input: { relatedProductIds?: string[]; suggestedProductIds?: string[] },
+  ) {
+    const existing = await this.recommendationsRepository.find({
+      where: { product: { id: productId } },
+      relations: { product: true, recommendedProduct: true },
+    });
+
+    const nextRelatedIds = input.relatedProductIds !== undefined
+      ? await this.resolveRecommendationProducts(input.relatedProductIds, productId, 'related')
+      : existing
+          .filter((item) => item.type === ProductRecommendationType.RELATED)
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((item) => item.recommendedProduct.id);
+
+    const nextSuggestedIds = input.suggestedProductIds !== undefined
+      ? await this.resolveRecommendationProducts(input.suggestedProductIds, productId, 'suggested')
+      : existing
+          .filter((item) => item.type === ProductRecommendationType.SUGGESTED)
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((item) => item.recommendedProduct.id);
+
+    await this.recommendationsRepository
+      .createQueryBuilder()
+      .delete()
+      .from(ProductRecommendation)
+      .where('product_id = :productId', { productId })
+      .execute();
+
+    const rows = [
+      ...nextRelatedIds.map((recommendedProductId, index) =>
+        this.recommendationsRepository.create({
+          product: { id: productId } as Product,
+          recommendedProduct: { id: recommendedProductId } as Product,
+          type: ProductRecommendationType.RELATED,
+          displayOrder: index,
+        }),
+      ),
+      ...nextSuggestedIds.map((recommendedProductId, index) =>
+        this.recommendationsRepository.create({
+          product: { id: productId } as Product,
+          recommendedProduct: { id: recommendedProductId } as Product,
+          type: ProductRecommendationType.SUGGESTED,
+          displayOrder: index,
+        }),
+      ),
+    ];
+
+    if (rows.length > 0) {
+      await this.recommendationsRepository.save(rows);
+    }
+  }
+
+  private mapProductRecommendations(product: Product & { recommendations?: ProductRecommendation[] }) {
+    const recommendations = product.recommendations ?? [];
+    const relatedProducts = recommendations
+      .filter((item) => item.type === ProductRecommendationType.RELATED)
+      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .map((item) => item.recommendedProduct);
+    const suggestedProducts = recommendations
+      .filter((item) => item.type === ProductRecommendationType.SUGGESTED)
+      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .map((item) => item.recommendedProduct);
+
+    return {
+      ...product,
+      relatedProducts,
+      suggestedProducts,
+    };
+  }
+
+  private async resolveCoupon(couponId?: string) {
+    if (!couponId) {
+      return null;
+    }
+
+    const coupon = await this.couponsRepository.findOne({ where: { id: couponId } });
+    if (!coupon) {
+      throw new NotFoundException('Coupon not found');
+    }
+
+    return coupon;
+  }
+
+  private normalizeSku(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .trim()
+      .replace(/[^A-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  }
+
+  private normalizeCurrencyCode(code: string) {
+    return code.trim().toUpperCase();
+  }
+
+  private async resolveCurrencyCode(code?: string) {
+    const fallbackCode = await this.currenciesService.getDefaultCurrencyCode();
+    const normalized = this.normalizeCurrencyCode(code || fallbackCode);
+    const currency = await this.currenciesService.ensureActive(normalized);
+    return currency.code;
+  }
+
+  private async ensureProductSkuAvailable(sku: string, ignoreId?: string) {
+    const existing = await this.productsRepository.findOne({ where: { sku } });
+
+    if (!existing) {
+      return;
+    }
+
+    if (ignoreId && existing.id === ignoreId) {
+      return;
+    }
+
+    throw new ConflictException('Product SKU already exists');
+  }
+
+  private normalizeOfferFields(
+    basePrice: number,
+    hasOffer?: boolean,
+    offerPrice?: number,
+    offerPercentage?: number,
+    existing?: { existingOfferPrice: string | null; existingOfferPercentage: string | null },
+  ) {
+    const enabled = !!hasOffer;
+    if (!enabled) {
+      return {
+        hasOffer: false,
+        offerPrice: null,
+        offerPercentage: null,
+      };
+    }
+
+    const resolvedOfferPrice = offerPrice ?? Number(existing?.existingOfferPrice ?? 0);
+    const resolvedOfferPercentage = offerPercentage ?? Number(existing?.existingOfferPercentage ?? 0);
+
+    if (offerPrice === undefined && offerPercentage === undefined && !existing?.existingOfferPrice && !existing?.existingOfferPercentage) {
+      throw new ConflictException('Offer price or offer percentage is required when offer is active');
+    }
+
+    let finalOfferPrice = resolvedOfferPrice;
+    let finalOfferPercentage = resolvedOfferPercentage;
+
+    if (offerPrice !== undefined && offerPercentage !== undefined) {
+      const expectedOfferPrice = Number((basePrice * (1 - offerPercentage / 100)).toFixed(2));
+      if (Math.abs(expectedOfferPrice - offerPrice) > 0.01) {
+        throw new ConflictException('Offer price does not match base price and offer percentage');
+      }
+      finalOfferPrice = offerPrice;
+      finalOfferPercentage = offerPercentage;
+    } else if (offerPrice !== undefined) {
+      finalOfferPercentage = Number((((basePrice - offerPrice) / basePrice) * 100).toFixed(2));
+      finalOfferPrice = offerPrice;
+    } else if (offerPercentage !== undefined) {
+      finalOfferPrice = Number((basePrice * (1 - offerPercentage / 100)).toFixed(2));
+      finalOfferPercentage = offerPercentage;
+    }
+
+    if (finalOfferPrice < 0 || finalOfferPrice > basePrice) {
+      throw new ConflictException('Offer price must be between 0 and base price');
+    }
+
+    if (finalOfferPercentage < 0 || finalOfferPercentage > 100) {
+      throw new ConflictException('Offer percentage must be between 0 and 100');
+    }
+
+    return {
+      hasOffer: true,
+      offerPrice: finalOfferPrice.toFixed(2),
+      offerPercentage: finalOfferPercentage.toFixed(2),
+    };
   }
 
   private async generateUniqueSlug(name: string, ignoreId?: string): Promise<string> {

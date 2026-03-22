@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { colorsService } from '@/services/catalog.service'
 import type { Color } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
@@ -7,23 +7,24 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
+import UiTable from '@/components/ui/UiTable.vue'
+import FormModalActions from '@/components/forms/FormModalActions.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
-const colors = ref<Color[]>([])
-const loading = ref(false)
+const colors = ref<Color[] | null>(null)
+const tableLoading = computed(() => colors.value === null)
 
 const formModal = reactive({ show: false, loading: false, isEdit: false, id: '', name: '', hexCode: '#000000' })
 const confirm = reactive({ show: false, id: '', name: '', loading: false })
 
 async function load() {
-  loading.value = true
+  colors.value = null
   try {
     colors.value = await colorsService.list()
   } catch {
+    colors.value = []
     toast.error('Error', 'No se pudieron cargar los colores')
-  } finally {
-    loading.value = false
   }
 }
 
@@ -95,40 +96,37 @@ onMounted(load)
     </div>
 
     <UiCard :padding="false">
-      <div v-if="loading" class="p-6 space-y-3">
-        <div v-for="i in 6" :key="i" class="h-11 rounded-lg bg-[--color-surface-100] animate-pulse" />
-      </div>
-      <div v-else-if="!colors.length" class="text-muted text-center py-16">No hay colores</div>
-      <div v-else class="overflow-x-auto -mb-6">
-        <table class="table-base">
-          <thead>
-            <tr>
-              <th class="table-th">Color</th>
-              <th class="table-th">HEX</th>
-              <th class="table-th">Creado</th>
-              <th class="table-th" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="c in colors" :key="c.id" class="table-tr-hover">
-              <td class="table-td">
-                <div class="flex items-center gap-2">
-                  <span class="w-4 h-4 rounded-full border border-[--color-surface-300]" :style="{ backgroundColor: c.hexCode }" />
-                  <span class="font-medium">{{ c.name }}</span>
-                </div>
-              </td>
-              <td class="table-td font-mono text-xs">{{ c.hexCode }}</td>
-              <td class="table-td text-muted text-xs">{{ new Date(c.createdAt).toLocaleDateString('es-AR') }}</td>
-              <td class="table-td text-right">
-                <div class="flex items-center gap-2 justify-end">
-                  <UiButton size="sm" variant="ghost" @click="openEdit(c)">Editar</UiButton>
-                  <UiButton size="sm" variant="danger" @click="askDelete(c)">Eliminar</UiButton>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <UiTable :data="colors" :loading="tableLoading" loading-color="primary" loading-text="Cargando colores..." no-min-width empty-message="No hay colores">
+        <template #head>
+          <tr>
+            <th class="table-th">Color</th>
+            <th class="table-th">HEX</th>
+            <th class="table-th">Creado</th>
+            <th class="table-th table-actions-th" />
+          </tr>
+        </template>
+
+        <tr v-for="c in colors ?? []" :key="c.id" class="table-tr-hover">
+          <td class="table-td">
+            <div class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full border border-[--color-surface-300]" :style="{ backgroundColor: c.hexCode }" />
+              <span class="font-medium">{{ c.name }}</span>
+            </div>
+          </td>
+          <td class="table-td font-mono text-xs">{{ c.hexCode }}</td>
+          <td class="table-td text-muted text-xs">{{ new Date(c.createdAt).toLocaleDateString('es-AR') }}</td>
+          <td class="table-td table-actions-td text-right">
+            <div class="flex items-center gap-2 justify-end">
+              <UiButton size="sm" variant="ghost" @click="openEdit(c)">Editar</UiButton>
+              <UiButton size="sm" variant="danger" @click="askDelete(c)">Eliminar</UiButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #empty-actions>
+          <UiButton size="sm" @click="openCreate">Crear color</UiButton>
+        </template>
+      </UiTable>
     </UiCard>
 
     <UiModal :show="formModal.show" :title="formModal.isEdit ? 'Editar color' : 'Nuevo color'" @close="formModal.show = false">
@@ -141,8 +139,7 @@ onMounted(load)
       </div>
 
       <template #footer>
-        <UiButton variant="secondary" @click="formModal.show = false">Cancelar</UiButton>
-        <UiButton :loading="formModal.loading" @click="saveColor">Guardar</UiButton>
+        <FormModalActions :loading="formModal.loading" @cancel="formModal.show = false" @save="saveColor" />
       </template>
     </UiModal>
 

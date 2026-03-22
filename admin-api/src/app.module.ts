@@ -21,6 +21,8 @@ import { ColorsModule } from './colors/colors.module';
 import { UsersModule } from './users/users.module';
 import { SizesModule } from './sizes/sizes.module';
 import { AdminToolsModule } from './admin-tools/admin-tools.module';
+import { TagsModule } from './tags/tags.module';
+import { CurrenciesModule } from './currencies/currencies.module';
 import { User } from './users/entities/user.entity';
 
 @Module({
@@ -61,6 +63,8 @@ import { User } from './users/entities/user.entity';
     OrdersModule,
     HealthModule,
     AdminToolsModule,
+    TagsModule,
+    CurrenciesModule,
   ],
   controllers: [AppController],
   providers: [

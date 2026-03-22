@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class ValidateCouponDto {
   @ApiProperty({ example: 'SUMMER20' })
@@ -7,5 +8,12 @@ export class ValidateCouponDto {
   code: string;
 
   @ApiProperty({ example: 100 })
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
   orderAmount: number;
+
+  @ApiProperty({ example: 'USD', required: false })
+  @IsOptional()
+  @IsString()
+  currencyCode?: string;
 }

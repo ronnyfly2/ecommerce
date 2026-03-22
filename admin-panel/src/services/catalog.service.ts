@@ -7,6 +7,8 @@ import type {
   CreateCategoryDto,
   CreateSizeDto,
   CreateColorDto,
+  Tag,
+  CreateTagDto,
 } from '@/types/api'
 
 export const categoriesService = {
@@ -64,5 +66,23 @@ export const colorsService = {
   },
   async remove(id: string) {
     await http.delete(`/colors/${id}`)
+  },
+}
+
+export const tagsService = {
+  async list() {
+    const res = await http.get<ApiResponse<Tag[]>>('/tags')
+    return res.data.data
+  },
+  async create(dto: CreateTagDto) {
+    const res = await http.post<ApiResponse<Tag>>('/tags', dto)
+    return res.data.data
+  },
+  async update(id: string, dto: Partial<CreateTagDto>) {
+    const res = await http.patch<ApiResponse<Tag>>(`/tags/${id}`, dto)
+    return res.data.data
+  },
+  async remove(id: string) {
+    await http.delete(`/tags/${id}`)
   },
 }

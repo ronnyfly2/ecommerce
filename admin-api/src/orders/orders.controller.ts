@@ -8,9 +8,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ORDER_MANAGE_ROLES } from '../common/auth/role-groups';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { QueryOrdersDto } from './dto/query-orders.dto';
@@ -48,12 +48,13 @@ export class OrdersController {
     return this.ordersService.findOne(id);
   }
 
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(...ORDER_MANAGE_ROLES)
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
+    @GetUser('id') actorUserId: string,
   ) {
-    return this.ordersService.updateStatus(id, dto);
+    return this.ordersService.updateStatus(id, dto, actorUserId);
   }
 }

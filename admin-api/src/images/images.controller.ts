@@ -11,8 +11,8 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import type { Request } from 'express';
 import type { Multer } from 'multer';
+import { PRODUCT_MANAGE_ROLES } from '../common/auth/role-groups';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
 import { ImagesService } from './images.service';
 
 // Factory function for typed multer storage
@@ -33,7 +33,7 @@ function createImageStorage(configService: ConfigService) {
 
 @ApiTags('Images')
 @ApiBearerAuth()
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles(...PRODUCT_MANAGE_ROLES)
 @Controller('images')
 export class ImagesController {
   constructor(

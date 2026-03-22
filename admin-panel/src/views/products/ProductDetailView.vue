@@ -1,25 +1,35 @@
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { productsService } from '@/services/products.service'
 import { extractErrorMessage } from '@/utils/error'
 import { sizesService, colorsService } from '@/services/catalog.service'
 import type { Product, Size, Color, CreateProductVariantDto, ProductImage } from '@/types/api'
 import { useToast } from '@/composables/useToast'
+import { preloadRichEditor } from '@/utils/preload-rich-editor'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
+import UiTable from '@/components/ui/UiTable.vue'
+import UiEmptyState from '@/components/ui/UiEmptyState.vue'
+import FormModalActions from '@/components/forms/FormModalActions.vue'
+import { formatMoney } from '@/utils/currency'
+import { getSystemCurrencyCode } from '@/utils/system-currency'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const auth = useAuthStore()
 
 const product = ref<Product | null>(null)
+const recommendations = ref<{ relatedProducts: Product[]; suggestedProducts: Product[] } | null>(null)
 const sizes = ref<Size[]>([])
 const colors = ref<Color[]>([])
 const loading = ref(true)
+const variantSkuTouched = ref(false)
 
 const variantModal = reactive({ show: false, loading: false })
 const variantForm = reactive<CreateProductVariantDto>({
@@ -39,23 +49,38 @@ const imageUpload = reactive({
   loading: false,
 })
 const imageActionLoading = ref<string | null>(null)
+const canManageProducts = computed(() => auth.can('products.manage'))
 
 const sortedImages = computed(() => {
   const items = product.value?.images ?? []
   return [...items].sort((a, b) => a.displayOrder - b.displayOrder)
 })
 
+const variantSkuPreview = computed(() =>
+  buildVariantSkuSuggestion(product.value?.sku ?? '', variantForm.sizeId, variantForm.colorId),
+)
+
 async function load() {
   loading.value = true
   try {
-    const [p, s, c] = await Promise.all([
+    const [p, rec] = await Promise.all([
       productsService.get(route.params.id as string),
-      sizesService.list(),
-      colorsService.list(),
+      productsService.getRecommendations(route.params.id as string),
     ])
     product.value = p
-    sizes.value = s
-    colors.value = c
+    recommendations.value = {
+      relatedProducts: rec.relatedProducts ?? [],
+      suggestedProducts: rec.suggestedProducts ?? [],
+    }
+
+    if (canManageProducts.value) {
+      const [s, c] = await Promise.all([sizesService.list(), colorsService.list()])
+      sizes.value = s
+      colors.value = c
+    } else {
+      sizes.value = []
+      colors.value = []
+    }
   } catch {
     toast.error('Error', 'No se pudo cargar el producto')
     router.push({ name: 'products' })
@@ -65,6 +90,14 @@ async function load() {
 }
 
 onMounted(load)
+
+watch(
+  () => [product.value?.sku, variantForm.sizeId, variantForm.colorId],
+  () => {
+    if (variantSkuTouched.value) return
+    variantForm.sku = variantSkuPreview.value
+  },
+)
 
 async function addVariant() {
   if (!product.value) return
@@ -80,6 +113,7 @@ async function addVariant() {
     variantForm.stock = 0
     variantForm.additionalPrice = 0
     variantForm.isActive = true
+    variantSkuTouched.value = false
     await load()
   } catch (e) {
     toast.error('Error', extractErrorMessage(e, 'Error al crear variante'))
@@ -171,13 +205,74 @@ async function removeImage(image: ProductImage) {
   }
 }
 
-function fmt(n: string | number) {
-  return Number(n).toLocaleString('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    minimumFractionDigits: 0,
-  })
+function fmt(n: string | number, currencyCode = product.value?.currencyCode || getSystemCurrencyCode()) {
+  return formatMoney(n, currencyCode)
 }
+
+
+function recommendationImage(product: Product) {
+  const main = product.images?.find((img) => img.isMain)
+  return main?.url || product.images?.[0]?.url || ''
+}
+
+function recommendationPrice(product: Product) {
+  if (product.hasOffer && product.offerPrice) {
+    return fmt(product.offerPrice, product.currencyCode)
+  }
+
+  return fmt(product.basePrice, product.currencyCode)
+}
+function onVariantSkuInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  variantSkuTouched.value = true
+  variantForm.sku = normalizeSku(target.value)
+}
+
+function resetVariantSku() {
+  variantSkuTouched.value = false
+  variantForm.sku = variantSkuPreview.value
+}
+
+function normalizeSku(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim()
+    .replace(/[^A-Z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+}
+
+function buildVariantSkuSuggestion(baseSku: string, sizeId: string, colorId: string) {
+  const parts = [normalizeSku(baseSku)]
+  const colorName = colors.value.find((color) => color.id === colorId)?.name ?? ''
+  const sizeName = sizes.value.find((size) => size.id === sizeId)?.name ?? ''
+
+  if (colorName) {
+    parts.push(normalizeSku(colorName))
+  }
+
+  if (sizeName) {
+    parts.push(normalizeSku(sizeName))
+  }
+
+  return parts.filter(Boolean).join('-')
+}
+
+const relatedForDisplay = computed(() => {
+  if (recommendations.value) {
+    return recommendations.value.relatedProducts
+  }
+  return product.value?.relatedProducts ?? []
+})
+
+const suggestedForDisplay = computed(() => {
+  if (recommendations.value) {
+    return recommendations.value.suggestedProducts
+  }
+  return product.value?.suggestedProducts ?? []
+})
 </script>
 
 <template>
@@ -201,9 +296,16 @@ function fmt(n: string | number) {
         </div>
         <h2 class="text-heading-2">{{ product.name }}</h2>
         <p class="text-muted">{{ product.slug }}</p>
+        <p class="text-caption font-mono mt-1">SKU: {{ product.sku }}</p>
       </div>
       <div class="flex gap-2 shrink-0">
-        <UiButton variant="secondary" @click="router.push({ name: 'products-edit', params: { id: product.id } })">
+        <UiButton
+          v-if="canManageProducts"
+          variant="secondary"
+          @mouseenter="preloadRichEditor()"
+          @focus="preloadRichEditor()"
+          @click="router.push({ name: 'products-edit', params: { id: product.id } })"
+        >
           Editar
         </UiButton>
       </div>
@@ -218,8 +320,12 @@ function fmt(n: string | number) {
               <p class="font-medium">{{ product.category?.name ?? '—' }}</p>
             </div>
             <div>
+              <p class="text-caption mb-1">SKU</p>
+              <p class="font-medium font-mono">{{ product.sku }}</p>
+            </div>
+            <div>
               <p class="text-caption mb-1">Precio base</p>
-              <p class="font-medium">{{ fmt(product.basePrice) }}</p>
+              <p class="font-medium">{{ fmt(product.basePrice, product.currencyCode) }}</p>
             </div>
             <div>
               <p class="text-caption mb-1">Estado</p>
@@ -236,22 +342,19 @@ function fmt(n: string | number) {
           </div>
           <div v-if="product.description" class="mt-4">
             <p class="text-caption mb-1">Descripción</p>
-            <p class="text-body">{{ product.description }}</p>
+            <div class="text-body prose prose-sm max-w-none" v-html="product.description" />
           </div>
         </UiCard>
 
         <UiCard>
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-heading-3">Variantes ({{ product.variants?.length ?? 0 }})</h3>
-            <UiButton size="sm" @click="variantModal.show = true">+ Agregar</UiButton>
+            <UiButton v-if="canManageProducts" size="sm" @click="variantModal.show = true">+ Agregar</UiButton>
           </div>
 
-          <div v-if="!product.variants?.length" class="text-muted text-center py-6">
-            Sin variantes
-          </div>
-          <div v-else class="overflow-x-auto -mx-6">
-            <table class="table-base">
-              <thead>
+          <div class="-mx-6">
+            <UiTable compact :empty="!product.variants?.length" empty-message="Sin variantes">
+              <template #head>
                 <tr>
                   <th class="table-th">SKU</th>
                   <th class="table-th">Talla</th>
@@ -259,53 +362,123 @@ function fmt(n: string | number) {
                   <th class="table-th text-right">Stock</th>
                   <th class="table-th text-right">+ Precio</th>
                   <th class="table-th text-center">Estado</th>
-                  <th class="table-th" />
+                  <th class="table-th table-actions-th" />
                 </tr>
-              </thead>
-              <tbody>
-                <tr v-for="v in product.variants" :key="v.id" class="table-tr-hover">
-                  <td class="table-td font-mono text-xs">{{ v.sku }}</td>
-                  <td class="table-td">{{ v.size?.name }}</td>
-                  <td class="table-td">
-                    <div class="flex items-center gap-2">
-                      <span
-                        class="w-4 h-4 rounded-full border border-[--color-surface-200] inline-block"
-                        :style="{ backgroundColor: v.color?.hexCode }"
-                      />
-                      {{ v.color?.name }}
-                    </div>
-                  </td>
-                  <td class="table-td text-right">
-                    <span :class="v.stock <= 0 ? 'text-[--color-danger-600]' : 'text-[--color-surface-900]'">
-                      {{ v.stock }}
-                    </span>
-                  </td>
-                  <td class="table-td text-right">{{ fmt(v.additionalPrice) }}</td>
-                  <td class="table-td text-center">
-                    <UiBadge :color="v.isActive ? 'success' : 'neutral'" dot>
-                      {{ v.isActive ? 'Activa' : 'Inactiva' }}
-                    </UiBadge>
-                  </td>
-                  <td class="table-td">
-                    <UiButton
-                      variant="danger"
-                      size="sm"
-                      @click="deleteConfirm.variantId = v.id; deleteConfirm.show = true"
-                    >
-                      Eliminar
-                    </UiButton>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+              </template>
+
+              <tr v-for="v in product.variants" :key="v.id" class="table-tr-hover">
+                <td class="table-td font-mono text-xs">{{ v.sku }}</td>
+                <td class="table-td">{{ v.size?.name }}</td>
+                <td class="table-td">
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="w-4 h-4 rounded-full border border-[--color-surface-200] inline-block"
+                      :style="{ backgroundColor: v.color?.hexCode }"
+                    />
+                    {{ v.color?.name }}
+                  </div>
+                </td>
+                <td class="table-td text-right">
+                  <span :class="v.stock <= 0 ? 'text-[--color-danger-600]' : 'text-[--color-surface-900]'">
+                    {{ v.stock }}
+                  </span>
+                </td>
+                <td class="table-td text-right">{{ fmt(v.additionalPrice, product.currencyCode) }}</td>
+                <td class="table-td text-center">
+                  <UiBadge :color="v.isActive ? 'success' : 'neutral'" dot>
+                    {{ v.isActive ? 'Activa' : 'Inactiva' }}
+                  </UiBadge>
+                </td>
+                <td class="table-td table-actions-td">
+                  <UiButton
+                    v-if="canManageProducts"
+                    variant="danger"
+                    size="sm"
+                    @click="deleteConfirm.variantId = v.id; deleteConfirm.show = true"
+                  >
+                    Eliminar
+                  </UiButton>
+                </td>
+              </tr>
+            </UiTable>
+          </div>
+        </UiCard>
+
+        <UiCard title="Recomendaciones del producto">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-medium text-[--color-surface-800]">Relacionados</h3>
+                <UiBadge color="neutral">{{ relatedForDisplay.length }}</UiBadge>
+              </div>
+
+              <UiEmptyState
+                v-if="!relatedForDisplay.length"
+                title="Sin productos relacionados"
+                description="Cuando configures recomendaciones aparecerán aquí."
+                compact
+              />
+
+              <button
+                v-for="related in relatedForDisplay"
+                :key="related.id"
+                type="button"
+                class="w-full rounded-xl border border-[--color-surface-200] bg-white p-3 text-left hover:border-[--color-primary-300]"
+                @click="router.push({ name: 'products-detail', params: { id: related.id } })"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-lg overflow-hidden bg-[--color-surface-100] shrink-0">
+                    <img v-if="recommendationImage(related)" :src="recommendationImage(related)" :alt="related.name" class="w-full h-full object-cover" />
+                  </div>
+                  <div class="min-w-0">
+                    <p class="font-medium text-[--color-surface-900] truncate">{{ related.name }}</p>
+                    <p class="text-xs font-mono text-[--color-surface-500] truncate">{{ related.sku }}</p>
+                    <p class="text-xs text-[--color-surface-700]">{{ recommendationPrice(related) }}</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-medium text-[--color-surface-800]">Sugeridos</h3>
+                <UiBadge color="primary">{{ suggestedForDisplay.length }}</UiBadge>
+              </div>
+
+              <UiEmptyState
+                v-if="!suggestedForDisplay.length"
+                title="Sin productos sugeridos"
+                description="Agrega sugeridos para impulsar venta cruzada."
+                compact
+              />
+
+              <button
+                v-for="suggested in suggestedForDisplay"
+                :key="suggested.id"
+                type="button"
+                class="w-full rounded-xl border border-[--color-surface-200] bg-white p-3 text-left hover:border-[--color-primary-300]"
+                @click="router.push({ name: 'products-detail', params: { id: suggested.id } })"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-lg overflow-hidden bg-[--color-surface-100] shrink-0">
+                    <img v-if="recommendationImage(suggested)" :src="recommendationImage(suggested)" :alt="suggested.name" class="w-full h-full object-cover" />
+                  </div>
+                  <div class="min-w-0">
+                    <p class="font-medium text-[--color-surface-900] truncate">{{ suggested.name }}</p>
+                    <p class="text-xs font-mono text-[--color-surface-500] truncate">{{ suggested.sku }}</p>
+                    <p class="text-xs text-[--color-surface-700]">{{ recommendationPrice(suggested) }}</p>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         </UiCard>
       </div>
 
       <div>
-        <UiCard title="Gestión de imágenes">
+        <UiCard :title="canManageProducts ? 'Gestión de imágenes' : 'Imágenes'">
           <div class="space-y-4">
-            <div class="space-y-2">
+            <div v-if="canManageProducts" class="space-y-2">
               <input type="file" accept="image/*" class="input-base" @change="onImageFileSelected" />
               <input v-model="imageUpload.altText" class="input-base" placeholder="Texto alternativo (opcional)" />
               <label class="flex items-center gap-2 text-sm text-[--color-surface-700]">
@@ -319,7 +492,7 @@ function fmt(n: string | number) {
 
             <div class="divider" />
 
-            <div v-if="!sortedImages.length" class="text-muted text-center py-6">Sin imágenes</div>
+            <UiEmptyState v-if="!sortedImages.length" title="Sin imágenes" compact />
 
             <div v-else class="grid grid-cols-2 gap-2">
               <div
@@ -338,6 +511,7 @@ function fmt(n: string | number) {
 
                 <div class="absolute inset-x-1 bottom-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <UiButton
+                    v-if="canManageProducts"
                     size="sm"
                     variant="secondary"
                     class="flex-1"
@@ -347,6 +521,7 @@ function fmt(n: string | number) {
                     Principal
                   </UiButton>
                   <UiButton
+                    v-if="canManageProducts"
                     size="sm"
                     variant="danger"
                     class="flex-1"
@@ -363,11 +538,11 @@ function fmt(n: string | number) {
       </div>
     </div>
 
-    <UiModal :show="variantModal.show" title="Nueva variante" @close="variantModal.show = false">
+    <UiModal v-if="canManageProducts" :show="variantModal.show" title="Nueva variante" @close="variantModal.show = false">
       <form @submit.prevent="addVariant" class="space-y-4">
         <div class="flex flex-col gap-1">
           <label class="text-sm font-medium text-[--color-surface-700]">SKU *</label>
-          <input v-model="variantForm.sku" required class="input-base" placeholder="SHIRT-BLK-M" />
+          <input :value="variantForm.sku" required class="input-base" placeholder="SHIRT-BLK-M" @input="onVariantSkuInput" />
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1">
@@ -385,6 +560,12 @@ function fmt(n: string | number) {
             </select>
           </div>
         </div>
+        <div class="flex items-center justify-between gap-3 text-xs text-[--color-surface-500]">
+          <span>Sugerido: {{ variantSkuPreview || 'SIN-SKU' }}</span>
+          <button type="button" class="font-medium text-[--color-primary-700] hover:text-[--color-primary-800]" @click="resetVariantSku">
+            Usar sugerencia
+          </button>
+        </div>
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1">
             <label class="text-sm font-medium text-[--color-surface-700]">Stock *</label>
@@ -397,12 +578,17 @@ function fmt(n: string | number) {
         </div>
       </form>
       <template #footer>
-        <UiButton variant="secondary" @click="variantModal.show = false">Cancelar</UiButton>
-        <UiButton :loading="variantModal.loading" @click="addVariant">Guardar variante</UiButton>
+        <FormModalActions
+          :loading="variantModal.loading"
+          save-label="Guardar variante"
+          @cancel="variantModal.show = false"
+          @save="addVariant"
+        />
       </template>
     </UiModal>
 
     <UiConfirm
+      v-if="canManageProducts"
       :show="deleteConfirm.show"
       title="Eliminar variante"
       message="¿Eliminar esta variante? El stock se perderá."

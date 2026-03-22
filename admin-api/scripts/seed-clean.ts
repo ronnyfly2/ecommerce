@@ -3,6 +3,7 @@ import { AppDataSource } from '../src/data-source';
 import { User } from '../src/users/entities/user.entity';
 import { Size } from '../src/sizes/entities/size.entity';
 import { Color } from '../src/colors/entities/color.entity';
+import { Category } from '../src/categories/entities/category.entity';
 import { ProductVariant } from '../src/products/entities/product-variant.entity';
 
 type CleanMode = 'seed' | 'users-all' | 'all';
@@ -84,9 +85,38 @@ async function cleanSeed() {
     const seedSizeAbbreviations = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
     const seedColorNames = ['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Gray', 'Navy'];
 
+    // All slugs seeded by the category seed, ordered leaves → branches → roots
+    const seedCategorySlugs = [
+      // L3 – Cuello Circular
+      'polos-cuello-circular-jersey-20-1',
+      'polos-cuello-circular-jersey-30-1',
+      'polos-cuello-circular-high-cotton-14-1',
+      'polos-cuello-circular-pima-40-1',
+      'polos-cuello-circular-cotton-32-1',
+      // L3 – Cuello V
+      'polos-cuello-v-jersey-20-1',
+      'polos-cuello-v-jersey-30-1',
+      'polos-cuello-v-high-cotton-14-1',
+      'polos-cuello-v-pima-40-1',
+      'polos-cuello-v-cotton-32-1',
+      // L3 – Cuello Polo
+      'polos-cuello-polo-jersey-20-1',
+      'polos-cuello-polo-jersey-30-1',
+      'polos-cuello-polo-high-cotton-14-1',
+      'polos-cuello-polo-pima-40-1',
+      'polos-cuello-polo-cotton-32-1',
+      // L2
+      'polos-cuello-circular',
+      'polos-cuello-v',
+      'polos-cuello-polo',
+      // L1
+      'polos-t-shirts',
+    ];
+
     const userRepository = AppDataSource.getRepository(User);
     const sizeRepository = AppDataSource.getRepository(Size);
     const colorRepository = AppDataSource.getRepository(Color);
+    const categoryRepository = AppDataSource.getRepository(Category);
     const variantRepository = AppDataSource.getRepository(ProductVariant);
 
     const usersToDelete = await userRepository.find({
@@ -192,6 +222,16 @@ async function cleanSeed() {
       deletedColors = colorsToDelete.length;
     }
 
+    // Remove seed categories in leaf-first order so SET NULL cascade doesn't leave orphans
+    let deletedCategories = 0;
+    for (const slug of seedCategorySlugs) {
+      const cat = await categoryRepository.findOne({ where: { slug } });
+      if (cat) {
+        await categoryRepository.remove(cat);
+        deletedCategories++;
+      }
+    }
+
     console.log('\n🧹 Seed cleanup summary:');
     console.log(`- Mode: ${forceMode ? 'seed-force' : 'seed-safe'}`);
     console.log(`- Users deleted: ${deletedUsers}`);
@@ -200,6 +240,7 @@ async function cleanSeed() {
     console.log(`- Order items deleted: ${forceDeletedOrderItems}`);
     console.log(`- Sizes deleted: ${deletedSizes}`);
     console.log(`- Colors deleted: ${deletedColors}`);
+    console.log(`- Categories deleted: ${deletedCategories}`);
 
     if (blockedSizeCount > 0) {
       console.log(

@@ -39,6 +39,13 @@ export class Order {
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   total: string;
 
+  @Column({ name: 'currency_code', type: 'varchar', length: 3, default: 'USD' })
+  currencyCode: string;
+
+  // Snapshot of exchange rate for historical consistency in reports.
+  @Column({ name: 'exchange_rate_to_usd', type: 'decimal', precision: 14, scale: 6, default: 1 })
+  exchangeRateToUsd: string;
+
   @ManyToOne(() => Coupon, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'coupon_id' })
   coupon: Coupon | null;

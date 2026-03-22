@@ -11,6 +11,11 @@ import type {
 } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
+import UiButton from '@/components/ui/UiButton.vue'
+import UiTable from '@/components/ui/UiTable.vue'
+import UiPagination from '@/components/ui/UiPagination.vue'
+import UiSpinner from '@/components/ui/UiSpinner.vue'
+import UiEmptyState from '@/components/ui/UiEmptyState.vue'
 import DashboardKpiCard from '@/components/shared/DashboardKpiCard.vue'
 import DashboardKpiIcon from '@/components/shared/DashboardKpiIcon.vue'
 import DashboardStatusCard from '@/components/shared/DashboardStatusCard.vue'
@@ -21,13 +26,18 @@ import {
   getDashboardStatusCount,
 } from './dashboard.config'
 import { normalizeApiList } from '@/utils/api-list'
+import { formatMoney } from '@/utils/currency'
 import { useToast } from '@/composables/useToast'
+import { convertUsdToSystemCurrency, getSystemCurrencyCode } from '@/utils/system-currency'
 
 const toast = useToast()
 const stats = ref<OrderStats | null>(null)
 const sales = ref<DashboardSalesInsights | null>(null)
 const inventoryAlerts = ref<DashboardInventoryAlerts | null>(null)
-const recentOrders = ref<Order[]>([])
+const recentOrders = ref<Order[] | null>(null)
+const recentOrdersPage = ref(1)
+const recentOrdersLimit = 5
+const recentOrdersTotal = ref(0)
 const loading = ref(true)
 const salesLoading = ref(false)
 
@@ -42,7 +52,7 @@ const salesPresetOptions: Array<{ id: SalesPreset; label: string }> = [
   { id: '7d', label: '7 dias' },
   { id: '30d', label: '30 dias' },
   { id: 'month', label: 'Por mes' },
-  { id: 'custom', label: 'Rango' },
+  { id: 'custom', label: 'Desde/Hasta' },
 ]
 
 const customQuickRanges = [
@@ -53,7 +63,11 @@ const customQuickRanges = [
 ]
 
 function fmt(n: number | string) {
-  return Number(n).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 })
+  return formatMoney(convertUsdToSystemCurrency(n), getSystemCurrencyCode())
+}
+
+function fmtOrder(n: number | string, currencyCode: string) {
+  return formatMoney(n, currencyCode || getSystemCurrencyCode())
 }
 
 const kpis = computed(() => {
@@ -126,6 +140,10 @@ const customRangeDays = computed(() => {
 })
 
 const canApplyCustomRange = computed(() => salesPreset.value === 'custom' && !customRangeError.value)
+const recentOrdersLoading = computed(() => recentOrders.value === null)
+const recentOrdersEmpty = computed(() => !recentOrdersLoading.value && (recentOrders.value?.length ?? 0) === 0)
+const recentOrdersTotalPages = computed(() => Math.max(1, Math.ceil(recentOrdersTotal.value / recentOrdersLimit)))
+const showRecentOrdersPagination = computed(() => recentOrdersTotalPages.value > 1)
 
 function formatDateInput(date: Date) {
   return date.toISOString().slice(0, 10)
@@ -175,9 +193,23 @@ async function loadSummary(params?: DashboardSummaryQuery) {
   inventoryAlerts.value = summary.inventoryAlerts
 }
 
-async function loadRecentOrders() {
-  const orders = await ordersService.list({ limit: 5, page: 1 })
-  recentOrders.value = normalizeApiList(orders).items.slice(0, 5)
+async function loadRecentOrders(page = recentOrdersPage.value) {
+  recentOrders.value = null
+  try {
+    const orders = await ordersService.list({ limit: recentOrdersLimit, page })
+    const result = normalizeApiList(orders)
+    recentOrders.value = result.items
+    recentOrdersTotal.value = result.total
+    recentOrdersPage.value = page
+  } catch {
+    recentOrders.value = []
+    recentOrdersTotal.value = 0
+  }
+}
+
+function changeRecentOrdersPage(page: number) {
+  if (page < 1 || page === recentOrdersPage.value) return
+  void loadRecentOrders(page)
 }
 
 async function refreshSales() {
@@ -237,7 +269,7 @@ onMounted(async () => {
   try {
     await Promise.all([
       loadSummary(buildSalesQuery()),
-      loadRecentOrders(),
+      loadRecentOrders(1),
     ])
   } catch {
     toast.error('Error', 'No se pudo cargar el dashboard')
@@ -252,7 +284,11 @@ onMounted(async () => {
 
     <!-- KPI cards -->
     <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      <div v-for="i in 4" :key="i" class="card p-6 h-28 animate-pulse bg-[--color-surface-100]" />
+      <UiCard v-for="i in 4" :key="i" :padding="false">
+        <div class="min-h-28 flex items-center justify-center px-4">
+          <UiSpinner label="Cargando KPI..." />
+        </div>
+      </UiCard>
     </div>
 
     <div v-else-if="stats" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -270,7 +306,15 @@ onMounted(async () => {
     </div>
 
     <!-- Estado pipeline -->
-    <div v-if="stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <UiCard v-for="i in 5" :key="`pipeline-loading-${i}`" :padding="false">
+        <div class="min-h-22 flex items-center justify-center px-4">
+          <UiSpinner label="Cargando estado..." size="sm" tone="neutral" />
+        </div>
+      </UiCard>
+    </div>
+
+    <div v-else-if="stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <DashboardStatusCard
         v-for="item in pipelineCards"
         :key="item.status"
@@ -280,8 +324,14 @@ onMounted(async () => {
       />
     </div>
 
-    <UiCard v-if="sales" title="Ventas">
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+    <UiCard title="Ventas">
+      <div v-if="loading && !sales">
+        <div class="min-h-56 flex items-center justify-center">
+          <UiSpinner label="Cargando ventas..." />
+        </div>
+      </div>
+
+      <div v-else-if="sales" class="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div class="min-w-0">
           <div class="mb-6 flex flex-col gap-4">
             <div class="flex flex-wrap items-center gap-3">
@@ -368,19 +418,19 @@ onMounted(async () => {
               <p v-else-if="customRangeDays" class="mt-3 text-sm text-[--color-surface-600]">
                 Rango seleccionado: {{ customRangeDays }} dias
               </p>
+              <p class="mt-2 text-xs text-[--color-surface-500]">
+                El rango se consulta solo cuando presionas Aceptar.
+              </p>
 
               <div class="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  class="w-full rounded-xl px-4 py-2 text-sm font-semibold text-white transition sm:w-auto"
-                  :class="canApplyCustomRange
-                    ? 'bg-[--color-primary-600] hover:bg-[--color-primary-700]'
-                    : 'cursor-not-allowed bg-[--color-surface-400]'"
+                <UiButton
+                  variant="primary"
+                  class="w-full sm:w-auto"
                   :disabled="!canApplyCustomRange"
                   @click="applyCustomSalesRange"
                 >
-                  Aplicar rango
-                </button>
+                  Aceptar
+                </UiButton>
               </div>
             </div>
 
@@ -398,8 +448,9 @@ onMounted(async () => {
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-surface-500]">Revenue del periodo</p>
               <p class="text-2xl font-semibold text-[--color-surface-950]">{{ fmt(sales.trend.totalRevenue) }}</p>
+              <p class="mt-1 text-xs text-[--color-surface-500]">Montos agregados mostrados en la moneda default configurada</p>
             </div>
-            <p v-if="salesLoading" class="text-xs font-semibold text-[--color-surface-500]">Actualizando...</p>
+            <UiSpinner v-if="salesLoading" inline size="sm" label="Actualizando..." tone="neutral" />
           </div>
 
           <div class="rounded-2xl border border-[--color-surface-200] bg-[--color-surface-50] p-4 sm:p-5">
@@ -431,9 +482,27 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <div v-else class="py-8 text-center text-muted">
+        No se pudieron cargar las ventas
+      </div>
     </UiCard>
 
-    <div v-if="inventoryAlerts" class="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-6">
+    <div v-if="loading && !inventoryAlerts" class="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-6">
+      <UiCard title="Alertas de inventario">
+        <div class="min-h-40 flex items-center justify-center">
+          <UiSpinner label="Cargando inventario..." />
+        </div>
+      </UiCard>
+
+      <UiCard title="Variantes críticas">
+        <div class="min-h-40 flex items-center justify-center">
+          <UiSpinner label="Cargando variantes..." />
+        </div>
+      </UiCard>
+    </div>
+
+    <div v-else-if="inventoryAlerts" class="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-6">
       <UiCard :title="`Alertas de inventario (umbral ${inventoryAlerts.threshold})`">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="rounded-2xl border border-[--color-warning-200] bg-[--color-warning-50] p-4">
@@ -451,9 +520,11 @@ onMounted(async () => {
       </UiCard>
 
       <UiCard title="Variantes críticas">
-        <div v-if="!inventoryAlerts.lowStockVariants.length" class="text-muted text-center py-8">
-          No hay variantes con stock crítico
-        </div>
+        <UiEmptyState
+          v-if="!inventoryAlerts.lowStockVariants.length"
+          title="No hay variantes con stock crítico"
+          description="Todo se encuentra por encima del umbral configurado."
+        />
         <div v-else class="space-y-4">
           <div
             v-for="variant in inventoryAlerts.lowStockVariants"
@@ -475,46 +546,50 @@ onMounted(async () => {
 
     <!-- Órdenes recientes -->
     <UiCard title="Órdenes recientes">
-      <div v-if="loading" class="space-y-4">
-        <div v-for="i in 5" :key="i" class="h-10 rounded-lg bg-[--color-surface-100] animate-pulse" />
-      </div>
-      <div v-else-if="!recentOrders.length" class="text-muted text-center py-8">
-        Sin órdenes aún
-      </div>
-      <div v-else class="overflow-x-auto -mx-6 -mb-6">
-        <table class="table-base">
-          <thead>
+      <div class="-mx-6 -mb-6">
+        <UiTable :data="recentOrders" :loading="recentOrdersLoading" :empty="recentOrdersEmpty" loading-color="primary" loading-text="Cargando órdenes recientes..." empty-message="Sin órdenes aún">
+          <template #head>
             <tr>
               <th class="table-th">ID</th>
               <th class="table-th">Cliente</th>
               <th class="table-th">Estado</th>
+              <th class="table-th">Moneda</th>
               <th class="table-th text-right">Total</th>
               <th class="table-th">Fecha</th>
             </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="o in recentOrders"
-              :key="o.id"
-              class="table-tr-hover cursor-pointer"
-              @click="$router.push({ name: 'orders-detail', params: { id: o.id } })"
-            >
-              <td class="table-td font-mono text-xs text-[--color-surface-500]">
-                #{{ o.id.slice(0, 8) }}
-              </td>
-              <td class="table-td">{{ o.user.email }}</td>
-              <td class="table-td">
-                <UiBadge :color="DASHBOARD_STATUS_META[o.status].badgeColor" dot>
-                  {{ DASHBOARD_STATUS_META[o.status].label }}
-                </UiBadge>
-              </td>
-              <td class="table-td text-right font-medium">{{ fmt(o.total) }}</td>
-              <td class="table-td text-muted text-xs">
-                {{ new Date(o.createdAt).toLocaleDateString('es-AR') }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          </template>
+
+          <tr
+            v-for="o in recentOrders ?? []"
+            :key="o.id"
+            class="table-tr-hover cursor-pointer"
+            @click="$router.push({ name: 'orders-detail', params: { id: o.id } })"
+          >
+            <td class="table-td font-mono text-xs text-[--color-surface-500]">
+              #{{ o.id.slice(0, 8) }}
+            </td>
+            <td class="table-td">{{ o.user.email }}</td>
+            <td class="table-td">
+              <UiBadge :color="DASHBOARD_STATUS_META[o.status].badgeColor" dot>
+                {{ DASHBOARD_STATUS_META[o.status].label }}
+              </UiBadge>
+            </td>
+            <td class="table-td text-muted text-xs">{{ o.currencyCode }}</td>
+            <td class="table-td text-right font-medium">{{ fmtOrder(o.total, o.currencyCode) }}</td>
+            <td class="table-td text-muted text-xs">
+              {{ new Date(o.createdAt).toLocaleDateString('es-AR') }}
+            </td>
+          </tr>
+        </UiTable>
+
+        <div v-if="showRecentOrdersPagination" class="border-t border-[--color-surface-200] p-4">
+          <UiPagination
+            :page="recentOrdersPage"
+            :total-pages="recentOrdersTotalPages"
+            :total="recentOrdersTotal"
+            @change="changeRecentOrdersPage"
+          />
+        </div>
       </div>
     </UiCard>
   </div>

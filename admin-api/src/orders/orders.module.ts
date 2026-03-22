@@ -13,6 +13,7 @@ import { User } from '../users/entities/user.entity';
 import { CouponsService } from '../coupons/coupons.service';
 import { CouponsModule } from '../coupons/coupons.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CurrenciesModule } from '../currencies/currencies.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     CouponsModule,
     NotificationsModule,
+    CurrenciesModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

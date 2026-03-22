@@ -4,6 +4,7 @@ import { authService } from '@/services/auth.service'
 import { clearTokens } from '@/services/http'
 import type { User, LoginDto } from '@/types/api'
 import { Role } from '@/types/api'
+import { hasRolePermission, hasRouteAccess, type PermissionKey } from '@/utils/permissions'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -11,9 +12,16 @@ export const useAuthStore = defineStore('auth', () => {
   const initialized = ref(false)
 
   const isAuthenticated = computed(() => !!user.value)
+  const currentRole = computed(() => user.value?.role ?? null)
   const isSuperAdmin = computed(() => user.value?.role === Role.SUPER_ADMIN)
+  const isBoss = computed(() => user.value?.role === Role.BOSS)
   const isAdmin = computed(
-    () => user.value?.role === Role.ADMIN || user.value?.role === Role.SUPER_ADMIN,
+    () =>
+      user.value?.role === Role.ADMIN ||
+      user.value?.role === Role.SUPER_ADMIN ||
+      user.value?.role === Role.BOSS ||
+      user.value?.role === Role.MARKETING ||
+      user.value?.role === Role.SALES,
   )
   const fullName = computed(() => {
     if (!user.value) return ''
@@ -51,5 +59,13 @@ export const useAuthStore = defineStore('auth', () => {
     clearTokens()
   }
 
-  return { user, loading, initialized, isAuthenticated, isSuperAdmin, isAdmin, fullName, login, fetchMe, logout, reset }
+  function can(permission: PermissionKey) {
+    return hasRolePermission(currentRole.value, permission)
+  }
+
+  function canAccessRoles(roles?: readonly Role[]) {
+    return hasRouteAccess(currentRole.value, roles)
+  }
+
+  return { user, loading, initialized, isAuthenticated, currentRole, isSuperAdmin, isBoss, isAdmin, fullName, login, fetchMe, logout, reset, can, canAccessRoles }
 })

@@ -60,6 +60,11 @@ export class CreateOrderDto {
   @IsString()
   couponCode?: string;
 
+  @ApiPropertyOptional({ example: 'USD', default: 'USD' })
+  @IsOptional()
+  @IsString()
+  currencyCode?: string;
+
   @ApiPropertyOptional({ example: 'Please leave at door' })
   @IsOptional()
   @IsString()

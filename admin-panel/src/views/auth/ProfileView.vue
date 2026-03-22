@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/services/auth.service'
@@ -10,6 +10,8 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiInput from '@/components/ui/UiInput.vue'
+import UiTable from '@/components/ui/UiTable.vue'
+import FormModalActions from '@/components/forms/FormModalActions.vue'
 import { useToast } from '@/composables/useToast'
 import { adminToolsService } from '@/services/admin-tools.service'
 import type { SeedCleanMode } from '@/types/api'
@@ -18,10 +20,10 @@ const router = useRouter()
 const auth = useAuthStore()
 const toast = useToast()
 
-const sessions = ref<RefreshTokenRecord[]>([])
-const loading = ref(true)
+const sessions = ref<RefreshTokenRecord[] | null>(null)
 const closingAll = ref(false)
 const revokingId = ref<string | null>(null)
+const tableLoading = computed(() => sessions.value === null)
 const showLocalSeedConfig = import.meta.env.DEV
 const seedActionLoading = ref<
   'run' | 'clean-seed' | 'clean-seed-force' | 'clean-users-all' | 'clean-all' | null
@@ -170,13 +172,12 @@ function getActionLabel(action: 'clean-seed-force' | 'clean-users-all' | 'clean-
 }
 
 async function loadSessions() {
-  loading.value = true
+  sessions.value = null
   try {
     sessions.value = await authService.sessions()
   } catch {
+    sessions.value = []
     toast.error('Error', 'No se pudieron cargar las sesiones activas')
-  } finally {
-    loading.value = false
   }
 }
 
@@ -244,49 +245,40 @@ onMounted(loadSessions)
         </UiButton>
       </div>
 
-      <div v-if="loading" class="space-y-3">
-        <div v-for="i in 5" :key="i" class="h-12 rounded-lg bg-[--color-surface-100] animate-pulse" />
-      </div>
-
-      <div v-else-if="!sessions.length" class="text-muted text-center py-8">
-        No hay sesiones activas
-      </div>
-
-      <div v-else class="overflow-x-auto -mx-6 -mb-6">
-        <table class="table-base">
-          <thead>
+      <div class="-mx-6 -mb-6">
+        <UiTable :data="sessions" :loading="tableLoading" loading-color="primary" loading-text="Cargando sesiones..." empty-message="No hay sesiones activas">
+          <template #head>
             <tr>
               <th class="table-th">Dispositivo</th>
               <th class="table-th">IP</th>
               <th class="table-th">Creada</th>
               <th class="table-th">Último uso</th>
               <th class="table-th">Expira</th>
-              <th class="table-th" />
+              <th class="table-th table-actions-th" />
             </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in sessions" :key="s.tokenId" class="table-tr-hover">
-              <td class="table-td">
-                <p class="font-medium text-[--color-surface-900]">{{ s.deviceName || 'Dispositivo desconocido' }}</p>
-                <p class="text-caption truncate max-w-[260px]">{{ s.userAgent || '—' }}</p>
-              </td>
-              <td class="table-td text-muted">{{ s.ipAddress || '—' }}</td>
-              <td class="table-td text-xs text-muted">{{ new Date(s.createdAt).toLocaleString('es-AR') }}</td>
-              <td class="table-td text-xs text-muted">{{ s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString('es-AR') : 'Nunca' }}</td>
-              <td class="table-td text-xs text-muted">{{ new Date(s.expiresAt).toLocaleString('es-AR') }}</td>
-              <td class="table-td text-right">
-                <UiButton
-                  size="sm"
-                  variant="danger"
-                  :loading="revokingId === s.tokenId"
-                  @click="revokeSession(s.tokenId)"
-                >
-                  Revocar
-                </UiButton>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          </template>
+
+          <tr v-for="s in sessions ?? []" :key="s.tokenId" class="table-tr-hover">
+            <td class="table-td">
+              <p class="font-medium text-[--color-surface-900]">{{ s.deviceName || 'Dispositivo desconocido' }}</p>
+              <p class="text-caption truncate max-w-65">{{ s.userAgent || '—' }}</p>
+            </td>
+            <td class="table-td text-muted">{{ s.ipAddress || '—' }}</td>
+            <td class="table-td text-xs text-muted">{{ new Date(s.createdAt).toLocaleString('es-AR') }}</td>
+            <td class="table-td text-xs text-muted">{{ s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString('es-AR') : 'Nunca' }}</td>
+            <td class="table-td text-xs text-muted">{{ new Date(s.expiresAt).toLocaleString('es-AR') }}</td>
+            <td class="table-td table-actions-td text-right">
+              <UiButton
+                size="sm"
+                variant="danger"
+                :loading="revokingId === s.tokenId"
+                @click="revokeSession(s.tokenId)"
+              >
+                Revocar
+              </UiButton>
+            </td>
+          </tr>
+        </UiTable>
       </div>
     </UiCard>
 
@@ -402,14 +394,15 @@ onMounted(loadSessions)
       </div>
 
       <template #footer>
-        <UiButton variant="ghost" @click="closeConfirmModal">Cancelar</UiButton>
-        <UiButton
-          variant="danger"
-          :disabled="confirmInput.trim() !== confirmKeyword"
-          @click="confirmDestructiveSeedAction"
-        >
-          Confirmar y ejecutar
-        </UiButton>
+        <FormModalActions
+          cancel-label="Cancelar"
+          save-label="Confirmar y ejecutar"
+          cancel-variant="ghost"
+          save-variant="danger"
+          :save-disabled="confirmInput.trim() !== confirmKeyword"
+          @cancel="closeConfirmModal"
+          @save="confirmDestructiveSeedAction"
+        />
       </template>
     </UiModal>
   </div>

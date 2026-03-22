@@ -111,6 +111,7 @@ export class DashboardService {
       select: {
         id: true,
         total: true,
+        exchangeRateToUsd: true,
         createdAt: true,
       },
       order: { createdAt: 'ASC' },
@@ -130,7 +131,8 @@ export class DashboardService {
         continue;
       }
       point.orders += 1;
-      point.revenue += Number(order.total);
+      const rate = Number(order.exchangeRateToUsd || 1);
+      point.revenue += Number(order.total) / rate;
     }
 
     const trendPoints = [] as Array<{

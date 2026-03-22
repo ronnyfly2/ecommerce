@@ -26,6 +26,9 @@ export class Coupon {
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   value: string;
 
+  @Column({ name: 'currency_code', type: 'varchar', length: 3, default: 'USD' })
+  currencyCode: string;
+
   @Column({ name: 'min_order_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
   minOrderAmount: string;
 

@@ -23,6 +23,18 @@ export class QueryProductsDto {
   categoryId?: string;
 
   @IsOptional()
+  @IsUUID()
+  tagId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  couponId?: string;
+
+  @IsOptional()
+  @IsString()
+  currencyCode?: string;
+
+  @IsOptional()
   @Transform(({ value }) => {
     if (value === 'true' || value === true) {
       return true;
@@ -34,4 +46,17 @@ export class QueryProductsDto {
   })
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) {
+      return true;
+    }
+    if (value === 'false' || value === false) {
+      return false;
+    }
+    return value;
+  })
+  @IsBoolean()
+  hasOffer?: boolean;
 }

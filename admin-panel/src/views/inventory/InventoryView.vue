@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { inventoryService } from '@/services/inventory.service'
 import { productsService } from '@/services/products.service'
@@ -14,16 +14,22 @@ import UiInput from '@/components/ui/UiInput.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
+import UiTable from '@/components/ui/UiTable.vue'
+import FormModalActions from '@/components/forms/FormModalActions.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const toast = useToast()
 const pg = usePagination(20)
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 
-const movements = ref<InventoryMovement[]>([])
+const movements = ref<InventoryMovement[] | null>(null)
 const products = ref<Product[]>([])
-const loading = ref(false)
 const initialized = ref(false)
+const tableLoading = computed(() => movements.value === null)
+const tableEmpty = computed(() => !tableLoading.value && (movements.value?.length ?? 0) === 0)
+const canManageInventory = computed(() => auth.can('inventory.manage'))
 
 const modal = reactive({
   show: false,
@@ -35,6 +41,7 @@ const modal = reactive({
 })
 
 const filters = reactive({ variantId: '' })
+const variantIdFilter = toRef(filters, 'variantId')
 
 function syncQuery() {
   const query: Record<string, string> = {}
@@ -75,7 +82,7 @@ function variantOptions() {
 }
 
 async function loadMovements() {
-  loading.value = true
+  movements.value = null
   try {
     const data = await inventoryService.movements({
       page: pg.page.value,
@@ -86,13 +93,12 @@ async function loadMovements() {
     movements.value = result.items
     pg.total.value = result.total
   } catch {
+    movements.value = []
     toast.error('Error', 'No se pudieron cargar movimientos de inventario')
-  } finally {
-    loading.value = false
   }
 }
 
-watch([() => pg.page.value, () => filters.variantId], async () => {
+watch([pg.page, variantIdFilter], async () => {
   if (!initialized.value) return
   syncQuery()
   await loadMovements()
@@ -148,58 +154,53 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
-      <UiSelect
-        v-model="filters.variantId"
-        :options="variantOptions()"
-        class="lg:min-w-[460px]"
-      />
-      <UiButton @click="openAdjustment">
-        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        Registrar ajuste
-      </UiButton>
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <UiSelect
+          v-model="filters.variantId"
+          :options="variantOptions()"
+          class="w-full sm:min-w-115"
+        />
+        <UiButton v-if="canManageInventory" @click="openAdjustment">
+          <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Nuevo movimiento
+        </UiButton>
+      </div>
     </div>
 
     <UiCard :padding="false">
-      <div v-if="loading" class="p-6 space-y-3">
-        <div v-for="i in 8" :key="i" class="h-11 rounded-lg bg-[--color-surface-100] animate-pulse" />
-      </div>
+      <UiTable :data="movements" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando movimientos..." empty-message="Sin movimientos de inventario">
+        <template #head>
+          <tr>
+            <th class="table-th">Fecha</th>
+            <th class="table-th">Producto / Variante</th>
+            <th class="table-th">Tipo</th>
+            <th class="table-th text-right">Cantidad</th>
+            <th class="table-th">Motivo</th>
+            <th class="table-th">Usuario</th>
+          </tr>
+        </template>
 
-      <div v-else-if="!movements.length" class="text-muted text-center py-16">
-        Sin movimientos de inventario
-      </div>
+        <tr v-for="m in movements ?? []" :key="m.id" class="table-tr-hover">
+          <td class="table-td text-xs text-muted">{{ new Date(m.createdAt).toLocaleString('es-AR') }}</td>
+          <td class="table-td">
+            <div class="font-medium text-[--color-surface-900]">{{ m.variant.product?.name ?? 'Producto' }}</div>
+            <div class="text-xs text-muted">{{ m.variant.sku }} · {{ m.variant.size.name }}/{{ m.variant.color.name }}</div>
+          </td>
+          <td class="table-td">{{ m.movementType }}</td>
+          <td :class="['table-td text-right font-semibold', movementColor(m.movementType)]">
+            {{ m.quantityChange > 0 ? '+' : '' }}{{ m.quantityChange }}
+          </td>
+          <td class="table-td text-muted">{{ m.reason || '—' }}</td>
+          <td class="table-td">{{ m.createdBy.email }}</td>
+        </tr>
 
-      <div v-else class="overflow-x-auto -mb-6">
-        <table class="table-base">
-          <thead>
-            <tr>
-              <th class="table-th">Fecha</th>
-              <th class="table-th">Producto / Variante</th>
-              <th class="table-th">Tipo</th>
-              <th class="table-th text-right">Cantidad</th>
-              <th class="table-th">Motivo</th>
-              <th class="table-th">Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="m in movements" :key="m.id" class="table-tr-hover">
-              <td class="table-td text-xs text-muted">{{ new Date(m.createdAt).toLocaleString('es-AR') }}</td>
-              <td class="table-td">
-                <div class="font-medium text-[--color-surface-900]">{{ m.variant.product?.name ?? 'Producto' }}</div>
-                <div class="text-xs text-muted">{{ m.variant.sku }} · {{ m.variant.size.name }}/{{ m.variant.color.name }}</div>
-              </td>
-              <td class="table-td">{{ m.movementType }}</td>
-              <td :class="['table-td text-right font-semibold', movementColor(m.movementType)]">
-                {{ m.quantityChange > 0 ? '+' : '' }}{{ m.quantityChange }}
-              </td>
-              <td class="table-td text-muted">{{ m.reason || '—' }}</td>
-              <td class="table-td">{{ m.createdBy.email }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <template #empty-actions>
+          <UiButton v-if="canManageInventory" size="sm" @click="openAdjustment">Nuevo movimiento</UiButton>
+        </template>
+      </UiTable>
 
       <div class="p-4 border-t border-[--color-surface-200]">
         <UiPagination
@@ -211,7 +212,7 @@ onMounted(async () => {
       </div>
     </UiCard>
 
-    <UiModal :show="modal.show" title="Registrar movimiento" @close="modal.show = false">
+    <UiModal v-if="canManageInventory" :show="modal.show" title="Nuevo movimiento" @close="modal.show = false">
       <div class="grid grid-cols-1 gap-4">
         <UiSelect
           v-model="modal.variantId"
@@ -233,8 +234,7 @@ onMounted(async () => {
       </div>
 
       <template #footer>
-        <UiButton variant="secondary" @click="modal.show = false">Cancelar</UiButton>
-        <UiButton :loading="modal.loading" @click="saveAdjustment">Guardar</UiButton>
+        <FormModalActions :loading="modal.loading" @cancel="modal.show = false" @save="saveAdjustment" />
       </template>
     </UiModal>
   </div>

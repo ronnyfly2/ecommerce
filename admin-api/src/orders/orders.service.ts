@@ -22,6 +22,7 @@ import { InventoryMovementType } from '../inventory/enums/inventory-movement-typ
 import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/entities/user.entity';
 import { Role } from '../common/enums/role.enum';
+import { CurrenciesService } from '../currencies/currencies.service';
 
 @Injectable()
 export class OrdersService {
@@ -44,6 +45,7 @@ export class OrdersService {
     private readonly usersRepository: Repository<User>,
     private readonly couponsService: CouponsService,
     private readonly notificationsService: NotificationsService,
+    private readonly currenciesService: CurrenciesService,
   ) {}
 
   async create(dto: CreateOrderDto, userId: string) {
@@ -51,6 +53,11 @@ export class OrdersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    const defaultCurrencyCode = await this.currenciesService.getDefaultCurrencyCode();
+    const orderCurrency = await this.currenciesService.ensureActive(
+      this.normalizeCurrencyCode(dto.currencyCode || defaultCurrencyCode),
+    );
 
     let subtotal = 0;
     const orderItems: OrderItem[] = [];
@@ -71,7 +78,15 @@ export class OrdersService {
         );
       }
 
-      const unitPrice = Number(variant.product.basePrice) + Number(variant.additionalPrice);
+      const baseUnitPrice = Number(variant.product.basePrice) + Number(variant.additionalPrice);
+      const productCurrency = await this.currenciesService.ensureActive(
+        this.normalizeCurrencyCode(variant.product.currencyCode || defaultCurrencyCode),
+      );
+      const unitPrice = await this.convertIfNeeded(
+        baseUnitPrice,
+        productCurrency.code,
+        orderCurrency.code,
+      );
       const itemSubtotal = unitPrice * item.quantity;
 
       subtotal += itemSubtotal;
@@ -91,7 +106,7 @@ export class OrdersService {
 
     if (dto.couponCode) {
       const validation = await this.couponsService.validate(
-        { code: dto.couponCode, orderAmount: subtotal },
+        { code: dto.couponCode, orderAmount: subtotal, currencyCode: orderCurrency.code },
         userId,
       );
 
@@ -115,6 +130,8 @@ export class OrdersService {
       subtotal: subtotal.toFixed(2),
       discount: discount.toFixed(2),
       total: total.toFixed(2),
+      currencyCode: orderCurrency.code,
+      exchangeRateToUsd: Number(orderCurrency.exchangeRateToUsd).toFixed(6),
       coupon: coupon ?? null,
       items: orderItems,
       notes: dto.notes ?? null,
@@ -142,6 +159,7 @@ export class OrdersService {
 
     const persistedOrder = await this.findOne(savedOrder.id);
     await this.notificationsService.sendOrderConfirmation(persistedOrder);
+    await this.notificationsService.notifyOrderCreated(persistedOrder);
 
     return persistedOrder;
   }
@@ -159,6 +177,10 @@ export class OrdersService {
 
     if (query.status) {
       where.status = query.status;
+    }
+
+    if (query.currencyCode) {
+      where.currencyCode = this.normalizeCurrencyCode(query.currencyCode);
     }
 
     const [items, total] = await this.ordersRepository.findAndCount({
@@ -198,8 +220,9 @@ export class OrdersService {
     return order;
   }
 
-  async updateStatus(id: string, dto: UpdateOrderStatusDto) {
+  async updateStatus(id: string, dto: UpdateOrderStatusDto, actorUserId?: string) {
     const order = await this.findOne(id);
+    const previousStatus = order.status;
 
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
@@ -220,7 +243,14 @@ export class OrdersService {
     }
 
     order.status = dto.status;
-    return this.ordersRepository.save(order);
+    const updatedOrder = await this.ordersRepository.save(order);
+    await this.notificationsService.notifyOrderStatusChanged(
+      updatedOrder,
+      previousStatus,
+      actorUserId,
+    );
+
+    return updatedOrder;
   }
 
   async getStats(requestUser: Pick<User, 'id' | 'role'>) {
@@ -231,8 +261,11 @@ export class OrdersService {
     const orders = await this.ordersRepository.find({ where });
 
     const totalOrders = orders.length;
-    const totalSpent = orders.reduce((sum, order) => sum + Number(order.total), 0);
-    const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+    const totalSpentUsd = orders.reduce((sum, order) => {
+      const rate = Number(order.exchangeRateToUsd || 1);
+      return sum + Number(order.total) / rate;
+    }, 0);
+    const averageOrderValueUsd = totalOrders > 0 ? totalSpentUsd / totalOrders : 0;
 
     const statusCounts = {
       [OrderStatus.PENDING]: 0,
@@ -248,20 +281,38 @@ export class OrdersService {
 
     return {
       totalOrders,
-      totalRevenue: Number(totalSpent.toFixed(2)),
+      totalRevenue: Number(totalSpentUsd.toFixed(2)),
       pendingOrders: statusCounts[OrderStatus.PENDING],
       confirmedOrders: statusCounts[OrderStatus.CONFIRMED],
       shippedOrders: statusCounts[OrderStatus.SHIPPED],
       deliveredOrders: statusCounts[OrderStatus.DELIVERED],
       cancelledOrders: statusCounts[OrderStatus.CANCELLED],
-      totalSpent: totalSpent.toFixed(2),
-      averageOrderValue: averageOrderValue.toFixed(2),
+      totalSpent: totalSpentUsd.toFixed(2),
+      averageOrderValue: averageOrderValueUsd.toFixed(2),
       statusCounts,
     };
   }
 
+  private normalizeCurrencyCode(code: string) {
+    return code.trim().toUpperCase();
+  }
+
+  private async convertIfNeeded(amount: number, fromCode: string, toCode: string) {
+    if (fromCode === toCode) {
+      return Number(amount.toFixed(2));
+    }
+
+    return this.currenciesService.convertAmount(amount, fromCode, toCode);
+  }
+
   private isAdminRole(role: Role): boolean {
-    return role === Role.ADMIN || role === Role.SUPER_ADMIN;
+    return [
+      Role.ADMIN,
+      Role.SUPER_ADMIN,
+      Role.BOSS,
+      Role.MARKETING,
+      Role.SALES,
+    ].includes(role);
   }
 
   private async decrementInventory(order: Order) {
