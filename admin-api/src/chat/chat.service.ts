@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
-  TooManyRequestsException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -164,7 +165,10 @@ export class ChatService {
     const recentTimestamps = timestamps.filter((ts) => now - ts < this.MESSAGE_WINDOW_MS);
 
     if (recentTimestamps.length >= this.MAX_MESSAGES_PER_MINUTE) {
-      throw new TooManyRequestsException('Too many messages. Please wait before sending another message.');
+      throw new HttpException(
+        'Too many messages. Please wait before sending another message.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     recentTimestamps.push(now);
