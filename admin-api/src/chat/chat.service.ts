@@ -81,15 +81,7 @@ export class ChatService {
 
     const [messages, total] = await this.chatRepository
       .createQueryBuilder('msg')
-      .leftJoin('msg.sender', 'sender')
-      .addSelect([
-        'sender.id',
-        'sender.email',
-        'sender.firstName',
-        'sender.lastName',
-        'sender.avatar',
-        'sender.role',
-      ])
+      .leftJoinAndSelect('msg.sender', 'sender')
       .where(
         '(msg.sender_id = :adminId AND msg.recipient_id = :userId) OR (msg.sender_id = :userId AND msg.recipient_id = :adminId)',
         { adminId, userId },
@@ -131,15 +123,7 @@ export class ChatService {
 
     const full = await this.chatRepository
       .createQueryBuilder('msg')
-      .leftJoin('msg.sender', 'sender')
-      .addSelect([
-        'sender.id',
-        'sender.email',
-        'sender.firstName',
-        'sender.lastName',
-        'sender.avatar',
-        'sender.role',
-      ])
+      .leftJoinAndSelect('msg.sender', 'sender')
       .where('msg.id = :id', { id: saved.id })
       .getOne();
 
