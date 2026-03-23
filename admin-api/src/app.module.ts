@@ -23,6 +23,8 @@ import { SizesModule } from './sizes/sizes.module';
 import { AdminToolsModule } from './admin-tools/admin-tools.module';
 import { TagsModule } from './tags/tags.module';
 import { CurrenciesModule } from './currencies/currencies.module';
+import { MeasurementUnitsModule } from './measurement-units/measurement-units.module';
+import { ChatModule } from './chat/chat.module';
 import { User } from './users/entities/user.entity';
 
 @Module({
@@ -65,6 +67,8 @@ import { User } from './users/entities/user.entity';
     AdminToolsModule,
     TagsModule,
     CurrenciesModule,
+    MeasurementUnitsModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [

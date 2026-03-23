@@ -18,6 +18,8 @@ import { RefreshToken } from './auth/entities/refresh-token.entity';
 import { Tag } from './tags/entities/tag.entity';
 import { Currency } from './currencies/entities/currency.entity';
 import { Notification } from './notifications/entities/notification.entity';
+import { MeasurementUnit } from './measurement-units/entities/measurement-unit.entity';
+import { ChatMessage } from './chat/entities/chat-message.entity';
 
 dotenv.config({ path: '.env' });
 
@@ -47,6 +49,8 @@ export const AppDataSource = new DataSource({
     Tag,
     Currency,
     Notification,
+    MeasurementUnit,
+    ChatMessage,
   ],
   migrations: ['src/migration/*.ts'],
   logging: false,

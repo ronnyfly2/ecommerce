@@ -197,6 +197,20 @@ export interface NotificationListData {
 // ----------------------------------------------------------
 // Categories
 // ----------------------------------------------------------
+export type CategoryAttributeDefinitionType = 'text' | 'number' | 'boolean' | 'select'
+
+export interface CategoryAttributeDefinition {
+  key: string
+  label: string
+  type: CategoryAttributeDefinitionType
+  unit: string | null
+  required: boolean
+  options: string[]
+  helpText: string | null
+  displayOrder: number
+  isActive: boolean
+}
+
 export interface Category {
   id: string
   name: string
@@ -205,6 +219,10 @@ export interface Category {
   image: string | null
   isActive: boolean
   displayOrder: number
+  supportsSizeColorVariants: boolean
+  supportsDimensions: boolean
+  supportsWeight: boolean
+  attributeDefinitions: CategoryAttributeDefinition[]
   parent: Category | null
   children: Category[]
   createdAt: string
@@ -217,6 +235,10 @@ export interface CreateCategoryDto {
   image?: string
   isActive?: boolean
   displayOrder?: number
+  supportsSizeColorVariants?: boolean
+  supportsDimensions?: boolean
+  supportsWeight?: boolean
+  attributeDefinitions?: CategoryAttributeDefinition[]
   parentId?: string
 }
 
@@ -263,6 +285,30 @@ export interface CreateSizeDto {
 }
 
 // ----------------------------------------------------------
+// Measurement Units
+// ----------------------------------------------------------
+export type MeasurementUnitFamily = 'weight' | 'length' | 'volume' | 'area' | 'count' | 'temperature' | 'time'
+
+export interface MeasurementUnit {
+  id: string
+  code: string
+  label: string
+  family: MeasurementUnitFamily
+  isActive: boolean
+  displayOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateMeasurementUnitDto {
+  code: string
+  label: string
+  family: MeasurementUnitFamily
+  isActive?: boolean
+  displayOrder?: number
+}
+
+// ----------------------------------------------------------
 // Tags
 // ----------------------------------------------------------
 export interface Tag {
@@ -286,6 +332,7 @@ export interface Color {
   id: string
   name: string
   hexCode: string
+  isActive: boolean
   createdAt: string
   updatedAt: string
 }
@@ -293,6 +340,7 @@ export interface Color {
 export interface CreateColorDto {
   name: string
   hexCode: string
+  isActive?: boolean
 }
 
 // ----------------------------------------------------------
@@ -332,6 +380,14 @@ export interface ProductVariant {
   updatedAt: string
 }
 
+export interface ProductAttributeValue {
+  key: string
+  label: string
+  type: CategoryAttributeDefinitionType
+  unit: string | null
+  value: string | number | boolean
+}
+
 export interface Product {
   id: string
   name: string
@@ -340,13 +396,22 @@ export interface Product {
   description: string | null
   basePrice: string
   currencyCode: string
+  stock: number
+  weightValue: string | null
+  weightUnit: string | null
+  lengthValue: string | null
+  widthValue: string | null
+  heightValue: string | null
+  dimensionUnit: string | null
   hasOffer: boolean
   offerPrice: string | null
   offerPercentage: string | null
+  attributeValues: ProductAttributeValue[]
   category: Category
   coupon: Coupon | null
   couponLink: string | null
   tags: Tag[]
+  variantProducts: Product[]
   relatedProducts: Product[]
   suggestedProducts: Product[]
   isActive: boolean
@@ -363,10 +428,18 @@ export interface CreateProductDto {
   description?: string
   basePrice: number
   currencyCode?: string
+  stock?: number
+  weightValue?: number | null
+  weightUnit?: string | null
+  lengthValue?: number | null
+  widthValue?: number | null
+  heightValue?: number | null
+  dimensionUnit?: string | null
   categoryId: string
   couponId?: string
   couponLink?: string
   tagIds?: string[]
+  variantProductIds?: string[]
   relatedProductIds?: string[]
   suggestedProductIds?: string[]
   isActive?: boolean
@@ -374,6 +447,7 @@ export interface CreateProductDto {
   hasOffer?: boolean
   offerPrice?: number
   offerPercentage?: number
+  attributeValues?: Array<{ key: string; value?: string | number | boolean | null }>
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}
@@ -417,7 +491,11 @@ export interface ShippingAddress {
 
 export interface OrderItem {
   id: string
-  variant: ProductVariant
+  product: Product | null
+  variant: ProductVariant | null
+  snapshotProductName: string | null
+  snapshotSku: string | null
+  snapshotDescriptor: string | null
   quantity: number
   unitPrice: string
   subtotal: string
@@ -467,8 +545,8 @@ export interface DashboardLowStockVariant {
   sku: string
   stock: number
   productName: string
-  sizeName: string
-  colorName: string
+  categoryName: string | null
+  descriptor: string | null
 }
 
 export interface DashboardInventoryAlerts {
@@ -556,7 +634,8 @@ export interface UpdateCouponDto extends Partial<CreateCouponDto> {}
 // ----------------------------------------------------------
 export interface InventoryMovement {
   id: string
-  variant: ProductVariant
+  product: Product | null
+  variant: ProductVariant | null
   movementType: InventoryMovementType
   quantityChange: number
   reason: string | null
@@ -565,7 +644,8 @@ export interface InventoryMovement {
 }
 
 export interface CreateInventoryAdjustmentDto {
-  variantId: string
+  productId?: string
+  variantId?: string
   quantityChange: number
   type: InventoryMovementType
   reason?: string
@@ -575,4 +655,47 @@ export interface QueryInventoryMovementsDto {
   page?: number
   limit?: number
   variantId?: string
+  productId?: string
 }
+
+// ----------------------------------------------------------
+// Chat
+// ----------------------------------------------------------
+export interface ChatMessageSender {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  avatar: string | null
+  role: Role
+}
+
+export interface ChatMessage {
+  id: string
+  senderId: string | null
+  recipientId: string | null
+  content: string
+  isRead: boolean
+  readAt: string | null
+  createdAt: string
+  sender: ChatMessageSender | null
+}
+
+export interface ConversationSummary {
+  userId: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  avatar: string | null
+  role: Role
+  lastMessageContent: string
+  lastMessageAt: string
+  lastMessageSenderId: string | null
+  unreadCount: number
+}
+
+export interface ChatMessagesData {
+  items: ChatMessage[]
+  meta: ApiPaginationMeta
+}
+

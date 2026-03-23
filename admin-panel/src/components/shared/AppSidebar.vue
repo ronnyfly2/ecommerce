@@ -52,6 +52,12 @@ const nav: NavItem[] = [
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9a6 6 0 00-12 0v.05c0 .243 0 .487-.002.7A8.967 8.967 0 013.69 15.77a23.848 23.848 0 005.454 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/>`,
   },
   {
+    name: 'chat',
+    label: 'Chat',
+    roles: BACKOFFICE_ROLES,
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/>`,
+  },
+  {
     name: 'coupons',
     label: 'Cupones',
     roles: COUPON_READ_ROLES,
@@ -83,6 +89,12 @@ const catalogNav: NavItem[] = [
     label: 'Tallas',
     roles: CATALOG_MANAGE_ROLES,
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5"/>`,
+  },
+  {
+    name: 'measurement-units',
+    label: 'Tipos de medida',
+    roles: CATALOG_MANAGE_ROLES,
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3v18m9-18v18M3 6.75h18M3 12h18M3 17.25h18"/>`,
   },
   {
     name: 'colors',
@@ -119,8 +131,8 @@ async function handleLogout() {
   <Transition name="fade">
     <div
       v-if="ui.sidebarMobileOpen"
-      class="fixed inset-0 bg-black/50 z-[--z-overlay] lg:hidden"
-      style="z-index: var(--z-overlay)"
+      class="fixed inset-0 bg-black/50 z-(--z-overlay) lg:hidden"
+      aria-hidden="true"
       @click="ui.closeMobileSidebar"
     />
   </Transition>
@@ -128,34 +140,36 @@ async function handleLogout() {
   <!-- Sidebar -->
   <aside
     :class="[
-      'fixed top-0 left-0 h-full bg-[--color-surface-0] border-r border-[--color-surface-200] flex flex-col transition-all duration-300 z-[--z-sticky]',
-      ui.sidebarCollapsed ? 'w-16' : 'w-[260px]',
+      'fixed top-0 left-0 h-full bg-surface-0 border-r border-surface-200 flex flex-col transition-all duration-300 z-(--z-sticky)',
+      ui.sidebarCollapsed ? 'w-16' : 'w-65',
       ui.sidebarMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
     ]"
-    style="z-index: var(--z-sticky)"
+    aria-label="Barra lateral"
   >
     <!-- Logo -->
-    <div class="flex items-center gap-3 px-4 h-16 border-b border-[--color-surface-200] shrink-0">
-      <div class="w-8 h-8 rounded-lg bg-[--color-primary-600] flex items-center justify-center shrink-0">
+    <div class="flex items-center gap-3 px-4 h-16 border-b border-surface-200 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
         <svg class="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
         </svg>
       </div>
       <Transition name="fade">
-        <span v-if="!ui.sidebarCollapsed" class="font-semibold text-[--color-surface-900] text-sm whitespace-nowrap">
+        <span v-if="!ui.sidebarCollapsed" class="font-semibold text-surface-900 text-sm whitespace-nowrap">
           Admin Panel
         </span>
       </Transition>
     </div>
 
     <!-- Nav principal -->
-    <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+    <nav class="flex-1 overflow-y-auto p-3 space-y-1" aria-label="Navegación principal">
       <template v-for="item in nav" :key="item.name">
         <router-link
           v-if="auth.canAccessRoles(item.roles)"
           :to="{ name: item.name }"
           :class="['sidebar-item', isActive(item.name) ? 'sidebar-item-active' : '']"
           :title="ui.sidebarCollapsed ? item.label : undefined"
+          :aria-label="ui.sidebarCollapsed ? item.label : undefined"
+          :aria-current="isActive(item.name) ? 'page' : undefined"
           @click="ui.closeMobileSidebar"
         >
           <svg class="w-5 h-5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" v-html="item.icon" />
@@ -180,6 +194,8 @@ async function handleLogout() {
             :to="{ name: item.name }"
             :class="['sidebar-item', isActive(item.name) ? 'sidebar-item-active' : '']"
             :title="ui.sidebarCollapsed ? item.label : undefined"
+            :aria-label="ui.sidebarCollapsed ? item.label : undefined"
+            :aria-current="isActive(item.name) ? 'page' : undefined"
             @click="ui.closeMobileSidebar"
           >
             <svg class="w-5 h-5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" v-html="item.icon" />
@@ -192,22 +208,23 @@ async function handleLogout() {
     </nav>
 
     <!-- Footer: usuario + logout -->
-    <div class="p-3 border-t border-[--color-surface-200] shrink-0">
+    <div class="p-3 border-t border-surface-200 shrink-0">
       <div
         v-if="!ui.sidebarCollapsed"
         class="flex items-center gap-3 px-3 py-2 rounded-lg"
       >
-        <div class="w-8 h-8 rounded-full bg-[--color-primary-100] flex items-center justify-center text-[--color-primary-700] font-semibold text-sm shrink-0">
+        <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-semibold text-sm shrink-0">
           {{ auth.fullName.charAt(0).toUpperCase() }}
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-[--color-surface-800] truncate">{{ auth.fullName }}</p>
+          <p class="text-sm font-medium text-surface-800 truncate">{{ auth.fullName }}</p>
           <p class="text-caption truncate">{{ auth.user?.role }}</p>
         </div>
         <router-link
           :to="{ name: 'profile' }"
           class="btn-base btn-ghost btn-sm p-1"
           title="Perfil y sesiones"
+          aria-label="Perfil y sesiones"
         >
           <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -216,6 +233,7 @@ async function handleLogout() {
         <button
           class="btn-base btn-ghost btn-sm p-1"
           title="Cerrar sesión"
+          aria-label="Cerrar sesión"
           @click="handleLogout"
         >
           <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -227,6 +245,7 @@ async function handleLogout() {
         v-else
         class="sidebar-item w-full justify-center"
         title="Perfil y sesiones"
+        aria-label="Perfil y sesiones"
         @click="router.push({ name: 'profile' })"
       >
         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -237,6 +256,7 @@ async function handleLogout() {
         v-if="ui.sidebarCollapsed"
         class="sidebar-item w-full justify-center"
         title="Cerrar sesión"
+        aria-label="Cerrar sesión"
         @click="handleLogout"
       >
         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

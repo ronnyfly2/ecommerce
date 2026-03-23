@@ -107,6 +107,12 @@ const router = createRouter({
           component: () => import('@/views/notifications/NotificationsView.vue'),
           meta: { title: 'Notificaciones', roles: BACKOFFICE_ROLES },
         },
+        {
+          path: 'chat',
+          name: 'chat',
+          component: () => import('@/views/chat/ChatView.vue'),
+          meta: { title: 'Chat', roles: BACKOFFICE_ROLES },
+        },
 
         // Cupones
         {
@@ -144,6 +150,12 @@ const router = createRouter({
           name: 'sizes',
           component: () => import('@/views/sizes/SizesView.vue'),
           meta: { title: 'Tallas', roles: CATALOG_MANAGE_ROLES },
+        },
+        {
+          path: 'measurement-units',
+          name: 'measurement-units',
+          component: () => import('@/views/measurement-units/MeasurementUnitsView.vue'),
+          meta: { title: 'Tipos de medida', roles: CATALOG_MANAGE_ROLES },
         },
         {
           path: 'colors',
