@@ -37,7 +37,8 @@ export const useChatStore = defineStore('chat', () => {
   async function sendMessage(userId: string, content: string): Promise<ChatMessage> {
     const res = await http.post<ApiResponse<ChatMessage>>(`/chat/${userId}/messages`, { content })
     const msg = res.data.data
-    messages.value[userId] = [...(messages.value[userId] ?? []), msg]
+    // NO agregar aquí, dejar que el WebSocket lo agregue para evitar duplicados
+    // messages.value[userId] = [...(messages.value[userId] ?? []), msg]
     updateConversationWithMessage(userId, msg)
     return msg
   }
