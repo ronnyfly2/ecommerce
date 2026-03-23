@@ -26,7 +26,25 @@ const convSearch = ref('')
 
 const msgContainer = ref<HTMLDivElement | null>(null)
 
-// ─── Búsqueda de usuario (nuevo mensaje) ────────────────────────────────────
+// ─── Emoticones y GIFs ──────────────────────────────────────────────────────
+const showEmojiPicker = ref(false)
+const showGifPicker = ref(false)
+const gifSearch = ref('')
+const gifResults = ref<{ id: string; title: string; url: string }[]>([])
+const searchingGifs = ref(false)
+let gifDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+const emojis = [
+  '😀', '😁', '😂', '🤣', '😃', '😄', '😅', '😆', '😉', '😊',
+  '😍', '🥰', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪',
+  '😌', '😔', '😑', '😐', '😶', '🤐', '😏', '😒', '🙁', '😲',
+  '😞', '😖', '😤', '😢', '😭', '😱', '😳', '🥺', '😦', '😧',
+  '😨', '😰', '😥', '😢', '😂', '🤣', '👍', '👎', '👋', '✋',
+  '❤️', '💔', '💕', '💖', '💗', '💙', '💚', '⭐', '🎉', '🎊',
+  '🔥', '✨', '💯', '👀', '🙈', '🙉', '🙊', '🐶', '🐱', '🦁',
+]
+
+
 const showUserPicker = ref(false)
 const userSearch = ref('')
 const userSearchResults = ref<User[]>([])
@@ -160,6 +178,52 @@ async function startConversationWith(user: User) {
     })
   }
   await selectConversation(user.id)
+}
+
+// ─── Emojis y GIFs ──────────────────────────────────────────────────────────
+function insertEmoji(emoji: string) {
+  draft.value += emoji
+  showEmojiPicker.value = false
+}
+
+function searchGifs() {
+  if (gifDebounceTimer) clearTimeout(gifDebounceTimer)
+  gifDebounceTimer = setTimeout(async () => {
+    const q = gifSearch.value.trim()
+    if (!q) {
+      gifResults.value = []
+      return
+    }
+    searchingGifs.value = true
+    try {
+      // Usando Giphy API (requiere VITE_GIPHY_API_KEY)
+      const apiKey = import.meta.env.VITE_GIPHY_API_KEY
+      if (!apiKey) {
+        gifResults.value = []
+        return
+      }
+      const res = await fetch(
+        `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(q)}&limit=6&offset=0&rating=g&lang=es`,
+      )
+      const data = await res.json()
+      gifResults.value = (data.data ?? []).map((gif: any) => ({
+        id: gif.id,
+        title: gif.title,
+        url: gif.images.fixed_height.url,
+      }))
+    } catch {
+      gifResults.value = []
+    } finally {
+      searchingGifs.value = false
+    }
+  }, 400)
+}
+
+function insertGif(gifUrl: string) {
+  draft.value += `\n${gifUrl}`
+  showGifPicker.value = false
+  gifSearch.value = ''
+  gifResults.value = []
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -344,7 +408,31 @@ watch(
 
         <!-- Input de mensaje -->
         <footer class="px-5 py-3 bg-surface-0 border-t border-surface-200 shrink-0">
-          <form class="flex items-end gap-3" @submit.prevent="send">
+          <form class="flex items-end gap-2" @submit.prevent="send">
+            <!-- Botones auxiliares -->
+            <div class="flex gap-1">
+              <button
+                type="button"
+                class="p-1.5 rounded-lg text-surface-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                title="Emojis"
+                @click="showEmojiPicker = !showEmojiPicker"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="p-1.5 rounded-lg text-surface-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                title="GIFs"
+                @click="showGifPicker = !showGifPicker"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+              </button>
+            </div>
+
             <textarea
               v-model="draft"
               placeholder="Escribe un mensaje… (Enter para enviar)"
@@ -364,6 +452,46 @@ watch(
               <UiSpinner v-else size="sm" />
             </UiButton>
           </form>
+
+          <!-- Emoji Picker -->
+          <div v-if="showEmojiPicker" class="mt-3 p-3 bg-surface-50 rounded-lg border border-surface-200 grid grid-cols-10 gap-2">
+            <button
+              v-for="emoji in emojis"
+              :key="emoji"
+              type="button"
+              class="text-2xl hover:scale-125 transition-transform"
+              @click="insertEmoji(emoji)"
+            >
+              {{ emoji }}
+            </button>
+          </div>
+
+          <!-- GIF Picker -->
+          <div v-if="showGifPicker" class="mt-3 p-3 bg-surface-50 rounded-lg border border-surface-200">
+            <input
+              v-model="gifSearch"
+              type="text"
+              placeholder="Buscar GIFs…"
+              class="w-full px-3 py-2 rounded border border-surface-300 text-sm mb-2"
+              @input="searchGifs"
+            />
+            <div v-if="searchingGifs" class="flex justify-center py-4">
+              <UiSpinner size="sm" />
+            </div>
+            <div v-else-if="gifResults.length > 0" class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+              <button
+                v-for="gif in gifResults"
+                :key="gif.id"
+                type="button"
+                class="rounded overflow-hidden hover:opacity-80 transition-opacity"
+                :title="gif.title"
+                @click="insertGif(gif.url)"
+              >
+                <img :src="gif.url" :alt="gif.title" class="w-full h-20 object-cover" />
+              </button>
+            </div>
+            <p v-else class="text-xs text-surface-400 text-center py-2">Escribe para buscar GIFs</p>
+          </div>
         </footer>
       </template>
     </div>

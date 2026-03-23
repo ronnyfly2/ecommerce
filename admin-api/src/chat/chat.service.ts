@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  TooManyRequestsException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -27,6 +28,9 @@ export interface ConversationSummary {
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
+  private readonly messageTimestamps = new Map<string, number[]>();
+  private readonly MAX_MESSAGES_PER_MINUTE = 20;
+  private readonly MESSAGE_WINDOW_MS = 60000; // 1 minuto
 
   constructor(
     @InjectRepository(ChatMessage)
@@ -79,17 +83,16 @@ export class ChatService {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 40, 100);
 
-    const [messages, total] = await this.chatRepository
-      .createQueryBuilder('msg')
-      .leftJoinAndSelect('msg.sender', 'sender')
-      .where(
-        '(msg.sender_id = :adminId AND msg.recipient_id = :userId) OR (msg.sender_id = :userId AND msg.recipient_id = :adminId)',
-        { adminId, userId },
-      )
-      .orderBy('msg.created_at', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    const [messages, total] = await this.chatRepository.findAndCount({
+      where: [
+        { senderId: adminId, recipientId: userId },
+        { senderId: userId, recipientId: adminId },
+      ],
+      relations: ['sender'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
 
     return {
       items: messages.reverse(),
@@ -103,8 +106,13 @@ export class ChatService {
   }
 
   async sendMessage(adminId: string, recipientId: string, content: string): Promise<ChatMessage> {
-    const trimmed = content.trim();
-    if (!trimmed) {
+    // Rate limiting
+    this.checkRateLimit(adminId);
+
+    // Sanitización
+    const sanitized = this.sanitizeMessage(content);
+
+    if (!sanitized) {
       throw new BadRequestException('Message content cannot be empty');
     }
 
@@ -116,16 +124,15 @@ export class ChatService {
     const message = this.chatRepository.create({
       senderId: adminId,
       recipientId,
-      content: trimmed,
+      content: sanitized,
     });
 
     const saved = await this.chatRepository.save(message);
 
-    const full = await this.chatRepository
-      .createQueryBuilder('msg')
-      .leftJoinAndSelect('msg.sender', 'sender')
-      .where('msg.id = :id', { id: saved.id })
-      .getOne();
+    const full = await this.chatRepository.findOne({
+      where: { id: saved.id },
+      relations: ['sender'],
+    });
 
     this.gateway.emitNewMessage(adminId, full!);
 
@@ -146,5 +153,35 @@ export class ChatService {
     this.gateway.emitReadReceipt(adminId, userId);
 
     return { updated: result.affected ?? 0 };
+  }
+
+  private checkRateLimit(adminId: string): void {
+    const now = Date.now();
+    const key = `chat:${adminId}`;
+    const timestamps = this.messageTimestamps.get(key) ?? [];
+
+    // Remover timestamps antiguos
+    const recentTimestamps = timestamps.filter((ts) => now - ts < this.MESSAGE_WINDOW_MS);
+
+    if (recentTimestamps.length >= this.MAX_MESSAGES_PER_MINUTE) {
+      throw new TooManyRequestsException('Too many messages. Please wait before sending another message.');
+    }
+
+    recentTimestamps.push(now);
+    this.messageTimestamps.set(key, recentTimestamps);
+  }
+
+  private sanitizeMessage(content: string): string {
+    // Remover tags HTML peligrosos
+    let sanitized = content
+      .replace(/<script[^>]*>.*?<\/script>/gi, '')
+      .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+      .replace(/<img[^>]*>/gi, '') // Remover tags img inline
+      .replace(/on\w+\s*=/gi, '') // Remover event handlers
+
+    // Limitar longitud
+    sanitized = sanitized.substring(0, 2000).trim()
+
+    return sanitized
   }
 }
