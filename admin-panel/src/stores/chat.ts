@@ -62,7 +62,11 @@ export const useChatStore = defineStore('chat', () => {
         if (!otherId) return
 
         if (messages.value[otherId]) {
-          messages.value[otherId] = [...messages.value[otherId], message]
+          // Evitar duplicado: no agregar si ya existe el mensaje por ID
+          const exists = messages.value[otherId].some((m) => m.id === message.id)
+          if (!exists) {
+            messages.value[otherId] = [...messages.value[otherId], message]
+          }
         }
         updateConversationWithMessage(otherId, message)
       },
