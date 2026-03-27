@@ -59,7 +59,14 @@ export class AuthService {
     });
 
     const savedUser = await this.usersRepository.save(user);
-    await this.notificationsService.notifyUserRegistered(savedUser);
+    try {
+      await this.notificationsService.notifyUserRegistered(savedUser);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown notification error';
+      this.logger.warn(
+        `User ${savedUser.id} was registered but the admin notification failed: ${message}`,
+      );
+    }
 
     return this.buildAuthResponse(savedUser, requestContext);
   }

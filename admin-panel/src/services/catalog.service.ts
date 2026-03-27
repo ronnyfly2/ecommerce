@@ -4,9 +4,11 @@ import type {
   Category,
   Size,
   Color,
+  MeasurementUnit,
   CreateCategoryDto,
   CreateSizeDto,
   CreateColorDto,
+  CreateMeasurementUnitDto,
   Tag,
   CreateTagDto,
 } from '@/types/api'
@@ -48,6 +50,24 @@ export const sizesService = {
   },
   async remove(id: string) {
     await http.delete(`/sizes/${id}`)
+  },
+}
+
+export const measurementUnitsService = {
+  async list() {
+    const res = await http.get<ApiResponse<MeasurementUnit[]>>('/measurement-units')
+    return res.data.data
+  },
+  async create(dto: CreateMeasurementUnitDto) {
+    const res = await http.post<ApiResponse<MeasurementUnit>>('/measurement-units', dto)
+    return res.data.data
+  },
+  async update(id: string, dto: Partial<CreateMeasurementUnitDto>) {
+    const res = await http.patch<ApiResponse<MeasurementUnit>>(`/measurement-units/${id}`, dto)
+    return res.data.data
+  },
+  async remove(id: string) {
+    await http.delete(`/measurement-units/${id}`)
   },
 }
 

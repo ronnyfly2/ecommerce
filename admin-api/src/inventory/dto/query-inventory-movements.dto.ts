@@ -17,4 +17,8 @@ export class QueryInventoryMovementsDto {
   @IsOptional()
   @IsString()
   variantId?: string;
+
+  @IsOptional()
+  @IsString()
+  productId?: string;
 }

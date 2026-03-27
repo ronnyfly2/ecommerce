@@ -10,8 +10,14 @@ import UiModal from '@/components/ui/UiModal.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiTable from '@/components/ui/UiTable.vue'
+import CatalogAuditHead from '@/components/catalog/CatalogAuditHead.vue'
+import CatalogAuditCells from '@/components/catalog/CatalogAuditCells.vue'
+import CatalogActionsHead from '@/components/catalog/CatalogActionsHead.vue'
+import CatalogActionsCell from '@/components/catalog/CatalogActionsCell.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
@@ -99,19 +105,21 @@ onMounted(load)
 
 <template>
   <div class="space-y-4">
-    <div class="flex justify-end">
-      <UiButton @click="openCreate">Nuevo tag</UiButton>
-    </div>
+    <ListViewToolbar>
+      <template #actions>
+        <UiButton @click="openCreate">Nuevo tag</UiButton>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="tags" :loading="tableLoading" loading-color="primary" loading-text="Cargando tags..." no-min-width empty-message="No hay tags">
+      <UiTable :data="tags" :loading="tableLoading" loading-color="primary" loading-text="Cargando tags..." empty-message="No hay tags">
         <template #head>
           <tr>
             <th class="table-th">Nombre</th>
             <th class="table-th">Slug</th>
             <th class="table-th text-center">Estado</th>
-            <th class="table-th">Creado</th>
-            <th class="table-th table-actions-th" />
+            <CatalogAuditHead />
+            <CatalogActionsHead />
           </tr>
         </template>
 
@@ -123,15 +131,8 @@ onMounted(load)
               {{ t.isActive ? 'Activo' : 'Inactivo' }}
             </UiBadge>
           </td>
-          <td class="table-td text-muted text-xs">
-            {{ new Date(t.createdAt).toLocaleDateString('es-AR') }}
-          </td>
-          <td class="table-td table-actions-td text-right">
-            <div class="flex items-center gap-2 justify-end">
-              <UiButton size="sm" variant="ghost" @click="openEdit(t)">Editar</UiButton>
-              <UiButton size="sm" variant="danger" @click="askDelete(t)">Eliminar</UiButton>
-            </div>
-          </td>
+          <CatalogAuditCells :created-at="t.createdAt" :updated-at="t.updatedAt" />
+          <CatalogActionsCell @edit="openEdit(t)" @delete="askDelete(t)" />
         </tr>
 
         <template #empty-actions>
@@ -145,10 +146,10 @@ onMounted(load)
       :title="formModal.isEdit ? 'Editar tag' : 'Nuevo tag'"
       @close="formModal.show = false"
     >
-      <div class="space-y-4">
-        <UiInput v-model="formModal.name" label="Nombre" required placeholder="ej: Nuevo, Oferta, Destacado..." />
+      <FormModalLayout :columns="1">
+        <UiInput v-model="formModal.name" label="Nombre" size="lg" required placeholder="ej: Nuevo, Oferta, Destacado..." />
         <FormToggleField v-model="formModal.isActive" label="Activo" />
-      </div>
+      </FormModalLayout>
 
       <template #footer>
         <FormModalActions :loading="formModal.loading" @cancel="formModal.show = false" @save="saveTag" />

@@ -9,6 +9,8 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
+import FormToggleField from '@/components/forms/FormToggleField.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
@@ -136,35 +138,33 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-      <div>
-        <h2 class="text-heading-2">Historial de notificaciones</h2>
-        <p class="text-sm text-[--color-surface-600]">
-          Tienes {{ unreadCount }} notificaciones sin leer.
-        </p>
-      </div>
-      <UiButton :disabled="unreadCount <= 0" @click="markAllAsRead">
-        Marcar todas como leidas
-      </UiButton>
-    </div>
+    <ListViewToolbar>
+      <template #filters>
+        <div>
+          <h2 class="text-heading-2">Historial de notificaciones</h2>
+          <p class="text-sm text-surface-600">
+            Tienes {{ unreadCount }} notificaciones sin leer.
+          </p>
+        </div>
+      </template>
+      <template #actions>
+        <UiButton :disabled="unreadCount <= 0" @click="markAllAsRead">
+          Marcar todas como leidas
+        </UiButton>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
-      <div class="p-4 border-b border-[--color-surface-200] flex flex-col sm:flex-row gap-3">
+      <div class="p-4 border-b border-surface-200 flex flex-col sm:flex-row gap-3">
         <UiSelect
           v-model="filters.type"
+          label="Filtrar por tipo"
+          size="sm"
           :options="typeOptions"
           class="sm:min-w-60"
           @update:model-value="applyFilters"
         />
-        <label class="flex items-center gap-2 text-sm text-[--color-surface-700]">
-          <input
-            v-model="filters.unreadOnly"
-            type="checkbox"
-            class="accent-[--color-primary-600]"
-            @change="applyFilters"
-          />
-          Solo no leidas
-        </label>
+        <FormToggleField v-model="filters.unreadOnly" label="Solo no leidas" size="sm" @update:model-value="applyFilters" />
       </div>
 
       <UiTable :data="items" :loading="loading" :empty="empty" loading-text="Cargando notificaciones..." empty-message="No hay notificaciones para este filtro">
@@ -183,10 +183,10 @@ onMounted(() => {
             <UiBadge :color="typeColor(item.type)" dot>{{ typeLabel(item.type) }}</UiBadge>
           </td>
           <td class="table-td">
-            <p class="font-medium text-[--color-surface-900]">{{ item.title }}</p>
-            <p class="text-xs text-[--color-surface-600] mt-1">{{ item.message }}</p>
+            <p class="font-medium text-surface-900">{{ item.title }}</p>
+            <p class="text-xs text-surface-600 mt-1">{{ item.message }}</p>
           </td>
-          <td class="table-td text-xs text-[--color-surface-600]">
+          <td class="table-td text-xs text-surface-600">
             <p>{{ formatRelative(item.createdAt) }}</p>
             <p>{{ new Date(item.createdAt).toLocaleString('es-AR') }}</p>
           </td>
@@ -215,7 +215,7 @@ onMounted(() => {
         </tr>
       </UiTable>
 
-      <div class="p-4 border-t border-[--color-surface-200]">
+      <div class="p-4 border-t border-surface-200">
         <UiPagination
           :page="meta.page"
           :total-pages="meta.totalPages"

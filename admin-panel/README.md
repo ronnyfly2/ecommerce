@@ -108,6 +108,12 @@ Regla: antes de crear un componente nuevo, revisar si se puede resolver combinan
 - Cliente HTTP con refresh automático en `src/services/http.ts`
 - Respuestas de API tipadas con envelope `ApiResponse<T>`
 
+## QA de Accesibilidad
+
+- Smoke test manual de teclado: [docs/keyboard-smoke-test.md](docs/keyboard-smoke-test.md)
+- Plantilla de QA de release: [docs/qa-release-template.md](docs/qa-release-template.md)
+- Auditoría automatizada con Axe: `npm run e2e:run:a11y`
+
 ## Módulos implementados
 
 - Auth (login + sesión)

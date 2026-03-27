@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, watch } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { productsService } from '@/services/products.service'
+import { reviewsService } from '@/services/reviews.service'
 import { extractErrorMessage } from '@/utils/error'
-import { sizesService, colorsService } from '@/services/catalog.service'
-import type { Product, Size, Color, CreateProductVariantDto, ProductImage } from '@/types/api'
+import type { Product, ProductImage, ProductReview, ReviewStats } from '@/types/api'
 import { useToast } from '@/composables/useToast'
 import { preloadRichEditor } from '@/utils/preload-rich-editor'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
-import UiModal from '@/components/ui/UiModal.vue'
-import UiConfirm from '@/components/ui/UiConfirm.vue'
+import UiFileInput from '@/components/ui/UiFileInput.vue'
+import UiInput from '@/components/ui/UiInput.vue'
 import UiTable from '@/components/ui/UiTable.vue'
 import UiEmptyState from '@/components/ui/UiEmptyState.vue'
-import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormToggleField from '@/components/forms/FormToggleField.vue'
 import { formatMoney } from '@/utils/currency'
 import { getSystemCurrencyCode } from '@/utils/system-currency'
 import { useAuthStore } from '@/stores/auth'
@@ -25,22 +25,64 @@ const toast = useToast()
 const auth = useAuthStore()
 
 const product = ref<Product | null>(null)
-const recommendations = ref<{ relatedProducts: Product[]; suggestedProducts: Product[] } | null>(null)
-const sizes = ref<Size[]>([])
-const colors = ref<Color[]>([])
-const loading = ref(true)
-const variantSkuTouched = ref(false)
 
-const variantModal = reactive({ show: false, loading: false })
-const variantForm = reactive<CreateProductVariantDto>({
-  sku: '',
-  sizeId: '',
-  colorId: '',
-  stock: 0,
-  additionalPrice: 0,
-  isActive: true,
-})
-const deleteConfirm = reactive({ show: false, variantId: '', loading: false })
+// Reviews
+const reviews = ref<ProductReview[]>([])
+const reviewStats = ref<ReviewStats | null>(null)
+const reviewsLoading = ref(false)
+const reviewsMeta = ref({ page: 1, limit: 10, total: 0, totalPages: 0 })
+const reviewsPage = ref(1)
+const reviewActionLoading = ref<string | null>(null)
+const canApproveReviews = computed(() => auth.isAdmin)
+
+async function loadReviews() {
+  if (!product.value) return
+  reviewsLoading.value = true
+  try {
+    const [data, stats] = await Promise.all([
+      reviewsService.listAllByProduct(product.value.id, { page: reviewsPage.value, limit: 10 }),
+      reviewsService.stats(product.value.id),
+    ])
+    reviews.value = data.items
+    reviewsMeta.value = data.meta
+    reviewStats.value = stats
+  } catch {
+    toast.error('Error', 'No se pudieron cargar las reviews')
+  } finally {
+    reviewsLoading.value = false
+  }
+}
+
+async function toggleApprove(review: ProductReview) {
+  if (!product.value) return
+  reviewActionLoading.value = review.id
+  try {
+    await reviewsService.update(product.value.id, review.id, { isApproved: !review.isApproved })
+    toast.success(review.isApproved ? 'Review desaprobada' : 'Review aprobada')
+    await loadReviews()
+  } catch (e) {
+    toast.error('Error', extractErrorMessage(e, 'No se pudo actualizar la review'))
+  } finally {
+    reviewActionLoading.value = null
+  }
+}
+
+async function deleteReview(review: ProductReview) {
+  if (!product.value) return
+  if (!window.confirm('¿Eliminar esta review? Esta acción no se puede deshacer.')) return
+  reviewActionLoading.value = review.id
+  try {
+    await reviewsService.remove(product.value.id, review.id)
+    toast.success('Review eliminada')
+    await loadReviews()
+  } catch (e) {
+    toast.error('Error', extractErrorMessage(e, 'No se pudo eliminar la review'))
+  } finally {
+    reviewActionLoading.value = null
+  }
+}
+const recommendations = ref<{ relatedProducts: Product[]; suggestedProducts: Product[] } | null>(null)
+const loading = ref(true)
 
 const imageUpload = reactive({
   file: null as File | null,
@@ -56,10 +98,6 @@ const sortedImages = computed(() => {
   return [...items].sort((a, b) => a.displayOrder - b.displayOrder)
 })
 
-const variantSkuPreview = computed(() =>
-  buildVariantSkuSuggestion(product.value?.sku ?? '', variantForm.sizeId, variantForm.colorId),
-)
-
 async function load() {
   loading.value = true
   try {
@@ -72,15 +110,6 @@ async function load() {
       relatedProducts: rec.relatedProducts ?? [],
       suggestedProducts: rec.suggestedProducts ?? [],
     }
-
-    if (canManageProducts.value) {
-      const [s, c] = await Promise.all([sizesService.list(), colorsService.list()])
-      sizes.value = s
-      colors.value = c
-    } else {
-      sizes.value = []
-      colors.value = []
-    }
   } catch {
     toast.error('Error', 'No se pudo cargar el producto')
     router.push({ name: 'products' })
@@ -89,54 +118,10 @@ async function load() {
   }
 }
 
-onMounted(load)
-
-watch(
-  () => [product.value?.sku, variantForm.sizeId, variantForm.colorId],
-  () => {
-    if (variantSkuTouched.value) return
-    variantForm.sku = variantSkuPreview.value
-  },
-)
-
-async function addVariant() {
-  if (!product.value) return
-
-  variantModal.loading = true
-  try {
-    await productsService.createVariant(product.value.id, { ...variantForm })
-    toast.success('Variante agregada')
-    variantModal.show = false
-    variantForm.sku = ''
-    variantForm.sizeId = ''
-    variantForm.colorId = ''
-    variantForm.stock = 0
-    variantForm.additionalPrice = 0
-    variantForm.isActive = true
-    variantSkuTouched.value = false
-    await load()
-  } catch (e) {
-    toast.error('Error', extractErrorMessage(e, 'Error al crear variante'))
-  } finally {
-    variantModal.loading = false
-  }
-}
-
-async function deleteVariant() {
-  if (!product.value) return
-
-  deleteConfirm.loading = true
-  try {
-    await productsService.removeVariant(product.value.id, deleteConfirm.variantId)
-    toast.success('Variante eliminada')
-    deleteConfirm.show = false
-    await load()
-  } catch {
-    toast.error('Error', 'No se pudo eliminar la variante')
-  } finally {
-    deleteConfirm.loading = false
-  }
-}
+onMounted(async () => {
+  await load()
+  await loadReviews()
+})
 
 function onImageFileSelected(event: Event) {
   const target = event.target as HTMLInputElement
@@ -222,43 +207,6 @@ function recommendationPrice(product: Product) {
 
   return fmt(product.basePrice, product.currencyCode)
 }
-function onVariantSkuInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  variantSkuTouched.value = true
-  variantForm.sku = normalizeSku(target.value)
-}
-
-function resetVariantSku() {
-  variantSkuTouched.value = false
-  variantForm.sku = variantSkuPreview.value
-}
-
-function normalizeSku(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .trim()
-    .replace(/[^A-Z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-}
-
-function buildVariantSkuSuggestion(baseSku: string, sizeId: string, colorId: string) {
-  const parts = [normalizeSku(baseSku)]
-  const colorName = colors.value.find((color) => color.id === colorId)?.name ?? ''
-  const sizeName = sizes.value.find((size) => size.id === sizeId)?.name ?? ''
-
-  if (colorName) {
-    parts.push(normalizeSku(colorName))
-  }
-
-  if (sizeName) {
-    parts.push(normalizeSku(sizeName))
-  }
-
-  return parts.filter(Boolean).join('-')
-}
 
 const relatedForDisplay = computed(() => {
   if (recommendations.value) {
@@ -278,7 +226,7 @@ const suggestedForDisplay = computed(() => {
 <template>
   <div v-if="loading" class="flex items-center justify-center py-20">
     <div class="flex flex-col items-center gap-3 text-muted">
-      <svg class="w-8 h-8 animate-spin text-[--color-primary-600]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="w-8 h-8 animate-spin text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
       </svg>
@@ -290,7 +238,7 @@ const suggestedForDisplay = computed(() => {
     <div class="flex items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-2 mb-1">
-          <button class="text-muted hover:text-[--color-surface-900] transition-colors text-sm" @click="router.push({ name: 'products' })">
+          <button class="text-muted hover:text-surface-900 transition-colors text-sm" @click="router.push({ name: 'products' })">
             ← Productos
           </button>
         </div>
@@ -348,56 +296,61 @@ const suggestedForDisplay = computed(() => {
 
         <UiCard>
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-heading-3">Variantes ({{ product.variants?.length ?? 0 }})</h3>
-            <UiButton v-if="canManageProducts" size="sm" @click="variantModal.show = true">+ Agregar</UiButton>
+            <h3 class="text-heading-3">Variantes independientes ({{ product.variantProducts?.length ?? 0 }})</h3>
           </div>
 
           <div class="-mx-6">
-            <UiTable compact :empty="!product.variants?.length" empty-message="Sin variantes">
+            <UiTable compact :empty="!product.variantProducts?.length" empty-message="Sin variantes independientes">
               <template #head>
                 <tr>
-                  <th class="table-th">SKU</th>
-                  <th class="table-th">Talla</th>
-                  <th class="table-th">Color</th>
-                  <th class="table-th text-right">Stock</th>
-                  <th class="table-th text-right">+ Precio</th>
+                  <th class="table-th">Producto</th>
+                  <th class="table-th text-right">Precio</th>
                   <th class="table-th text-center">Estado</th>
                   <th class="table-th table-actions-th" />
                 </tr>
               </template>
 
-              <tr v-for="v in product.variants" :key="v.id" class="table-tr-hover">
-                <td class="table-td font-mono text-xs">{{ v.sku }}</td>
-                <td class="table-td">{{ v.size?.name }}</td>
+              <tr v-for="variantProduct in product.variantProducts" :key="variantProduct.id" class="table-tr-hover">
                 <td class="table-td">
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="w-4 h-4 rounded-full border border-[--color-surface-200] inline-block"
-                      :style="{ backgroundColor: v.color?.hexCode }"
-                    />
-                    {{ v.color?.name }}
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg overflow-hidden bg-surface-100 shrink-0">
+                      <img
+                        v-if="recommendationImage(variantProduct)"
+                        :src="recommendationImage(variantProduct)"
+                        :alt="variantProduct.name"
+                        class="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p class="font-medium text-surface-900">{{ variantProduct.name }}</p>
+                      <p class="text-caption font-mono">{{ variantProduct.sku }}</p>
+                    </div>
                   </div>
                 </td>
-                <td class="table-td text-right">
-                  <span :class="v.stock <= 0 ? 'text-[--color-danger-600]' : 'text-[--color-surface-900]'">
-                    {{ v.stock }}
-                  </span>
-                </td>
-                <td class="table-td text-right">{{ fmt(v.additionalPrice, product.currencyCode) }}</td>
+                <td class="table-td text-right">{{ recommendationPrice(variantProduct) }}</td>
                 <td class="table-td text-center">
-                  <UiBadge :color="v.isActive ? 'success' : 'neutral'" dot>
-                    {{ v.isActive ? 'Activa' : 'Inactiva' }}
+                  <UiBadge :color="variantProduct.isActive ? 'success' : 'neutral'" dot>
+                    {{ variantProduct.isActive ? 'Activa' : 'Inactiva' }}
                   </UiBadge>
                 </td>
                 <td class="table-td table-actions-td">
-                  <UiButton
-                    v-if="canManageProducts"
-                    variant="danger"
-                    size="sm"
-                    @click="deleteConfirm.variantId = v.id; deleteConfirm.show = true"
-                  >
-                    Eliminar
-                  </UiButton>
+                  <div class="flex items-center justify-end gap-1">
+                    <UiButton
+                      size="sm"
+                      variant="secondary"
+                      @click="router.push({ name: 'products-detail', params: { id: variantProduct.id } })"
+                    >
+                      Ver
+                    </UiButton>
+                    <UiButton
+                      v-if="canManageProducts"
+                      size="sm"
+                      variant="ghost"
+                      @click="router.push({ name: 'products-edit', params: { id: variantProduct.id } })"
+                    >
+                      Editar
+                    </UiButton>
+                  </div>
                 </td>
               </tr>
             </UiTable>
@@ -408,7 +361,7 @@ const suggestedForDisplay = computed(() => {
           <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <div class="space-y-3">
               <div class="flex items-center justify-between">
-                <h3 class="text-sm font-medium text-[--color-surface-800]">Relacionados</h3>
+                <h3 class="text-sm font-medium text-surface-800">Relacionados</h3>
                 <UiBadge color="neutral">{{ relatedForDisplay.length }}</UiBadge>
               </div>
 
@@ -423,17 +376,17 @@ const suggestedForDisplay = computed(() => {
                 v-for="related in relatedForDisplay"
                 :key="related.id"
                 type="button"
-                class="w-full rounded-xl border border-[--color-surface-200] bg-white p-3 text-left hover:border-[--color-primary-300]"
+                class="w-full rounded-xl border border-surface-200 bg-surface-0 p-3 text-left hover:border-primary-300"
                 @click="router.push({ name: 'products-detail', params: { id: related.id } })"
               >
                 <div class="flex items-center gap-3">
-                  <div class="w-11 h-11 rounded-lg overflow-hidden bg-[--color-surface-100] shrink-0">
+                  <div class="w-11 h-11 rounded-lg overflow-hidden bg-surface-100 shrink-0">
                     <img v-if="recommendationImage(related)" :src="recommendationImage(related)" :alt="related.name" class="w-full h-full object-cover" />
                   </div>
                   <div class="min-w-0">
-                    <p class="font-medium text-[--color-surface-900] truncate">{{ related.name }}</p>
-                    <p class="text-xs font-mono text-[--color-surface-500] truncate">{{ related.sku }}</p>
-                    <p class="text-xs text-[--color-surface-700]">{{ recommendationPrice(related) }}</p>
+                    <p class="font-medium text-surface-900 truncate">{{ related.name }}</p>
+                    <p class="text-xs font-mono text-surface-500 truncate">{{ related.sku }}</p>
+                    <p class="text-xs text-surface-700">{{ recommendationPrice(related) }}</p>
                   </div>
                 </div>
               </button>
@@ -441,7 +394,7 @@ const suggestedForDisplay = computed(() => {
 
             <div class="space-y-3">
               <div class="flex items-center justify-between">
-                <h3 class="text-sm font-medium text-[--color-surface-800]">Sugeridos</h3>
+                <h3 class="text-sm font-medium text-surface-800">Sugeridos</h3>
                 <UiBadge color="primary">{{ suggestedForDisplay.length }}</UiBadge>
               </div>
 
@@ -456,20 +409,126 @@ const suggestedForDisplay = computed(() => {
                 v-for="suggested in suggestedForDisplay"
                 :key="suggested.id"
                 type="button"
-                class="w-full rounded-xl border border-[--color-surface-200] bg-white p-3 text-left hover:border-[--color-primary-300]"
+                class="w-full rounded-xl border border-surface-200 bg-surface-0 p-3 text-left hover:border-primary-300"
                 @click="router.push({ name: 'products-detail', params: { id: suggested.id } })"
               >
                 <div class="flex items-center gap-3">
-                  <div class="w-11 h-11 rounded-lg overflow-hidden bg-[--color-surface-100] shrink-0">
+                  <div class="w-11 h-11 rounded-lg overflow-hidden bg-surface-100 shrink-0">
                     <img v-if="recommendationImage(suggested)" :src="recommendationImage(suggested)" :alt="suggested.name" class="w-full h-full object-cover" />
                   </div>
                   <div class="min-w-0">
-                    <p class="font-medium text-[--color-surface-900] truncate">{{ suggested.name }}</p>
-                    <p class="text-xs font-mono text-[--color-surface-500] truncate">{{ suggested.sku }}</p>
-                    <p class="text-xs text-[--color-surface-700]">{{ recommendationPrice(suggested) }}</p>
+                    <p class="font-medium text-surface-900 truncate">{{ suggested.name }}</p>
+                    <p class="text-xs font-mono text-surface-500 truncate">{{ suggested.sku }}</p>
+                    <p class="text-xs text-surface-700">{{ recommendationPrice(suggested) }}</p>
                   </div>
                 </div>
               </button>
+            </div>
+          </div>
+        </UiCard>
+
+        <UiCard>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-heading-3">Reviews de clientes</h3>
+            <div v-if="reviewStats" class="flex items-center gap-3">
+              <span class="text-sm text-muted">
+                {{ reviewStats.total }} reseña{{ reviewStats.total !== 1 ? 's' : '' }} aprobada{{ reviewStats.total !== 1 ? 's' : '' }}
+              </span>
+              <div v-if="reviewStats.average !== null" class="flex items-center gap-1">
+                <span class="text-yellow-500">★</span>
+                <span class="font-medium text-sm">{{ reviewStats.average }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="reviewStats && reviewStats.total > 0" class="mb-4 grid grid-cols-5 gap-2">
+            <div
+              v-for="star in [5, 4, 3, 2, 1]"
+              :key="star"
+              class="flex flex-col items-center gap-1 rounded-lg bg-surface-50 p-2"
+            >
+              <span class="text-yellow-500 text-sm leading-none">{{ '★'.repeat(star) }}</span>
+              <span class="font-semibold text-sm">{{ reviewStats.distribution[String(star)] ?? 0 }}</span>
+            </div>
+          </div>
+
+          <div v-if="reviewsLoading" class="flex justify-center py-8">
+            <svg class="w-6 h-6 animate-spin text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+          </div>
+
+          <UiEmptyState v-else-if="!reviews.length" title="Sin reviews" description="Este producto aún no tiene reseñas de clientes." compact />
+
+          <div v-else class="space-y-3 -mx-6">
+            <div
+              v-for="review in reviews"
+              :key="review.id"
+              class="px-6 py-3 border-b border-surface-100 last:border-0"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-yellow-500 text-sm leading-none">{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span>
+                    <UiBadge :color="review.isApproved ? 'success' : 'warning'" dot>
+                      {{ review.isApproved ? 'Aprobada' : 'Pendiente' }}
+                    </UiBadge>
+                  </div>
+                  <p v-if="review.comment" class="text-sm text-surface-800 mb-1">{{ review.comment }}</p>
+                  <p class="text-caption">
+                    {{ review.user.email }}
+                    <span v-if="review.user.firstName || review.user.lastName">
+                      - {{ [review.user.firstName, review.user.lastName].filter(Boolean).join(' ') }}
+                    </span>
+                  </p>
+                  <p class="text-caption mt-0.5">{{ new Date(review.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) }}</p>
+                </div>
+
+                <div v-if="canApproveReviews" class="flex items-center gap-1 shrink-0">
+                  <UiButton
+                    size="sm"
+                    :variant="review.isApproved ? 'secondary' : 'primary'"
+                    :loading="reviewActionLoading === review.id"
+                    @click="toggleApprove(review)"
+                  >
+                    {{ review.isApproved ? 'Desaprobar' : 'Aprobar' }}
+                  </UiButton>
+                  <UiButton
+                    size="sm"
+                    variant="danger"
+                    :loading="reviewActionLoading === review.id"
+                    @click="deleteReview(review)"
+                  >
+                    Eliminar
+                  </UiButton>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="reviewsMeta.totalPages > 1" class="flex items-center justify-between mt-4 pt-4 border-t border-surface-100">
+            <span class="text-caption">
+              Página {{ reviewsMeta.page }} de {{ reviewsMeta.totalPages }}
+              ({{ reviewsMeta.total }} en total)
+            </span>
+            <div class="flex gap-2">
+              <UiButton
+                size="sm"
+                variant="secondary"
+                :disabled="reviewsMeta.page <= 1"
+                @click="reviewsPage--; loadReviews()"
+              >
+                Anterior
+              </UiButton>
+              <UiButton
+                size="sm"
+                variant="secondary"
+                :disabled="reviewsMeta.page >= reviewsMeta.totalPages"
+                @click="reviewsPage++; loadReviews()"
+              >
+                Siguiente
+              </UiButton>
             </div>
           </div>
         </UiCard>
@@ -479,12 +538,9 @@ const suggestedForDisplay = computed(() => {
         <UiCard :title="canManageProducts ? 'Gestión de imágenes' : 'Imágenes'">
           <div class="space-y-4">
             <div v-if="canManageProducts" class="space-y-2">
-              <input type="file" accept="image/*" class="input-base" @change="onImageFileSelected" />
-              <input v-model="imageUpload.altText" class="input-base" placeholder="Texto alternativo (opcional)" />
-              <label class="flex items-center gap-2 text-sm text-[--color-surface-700]">
-                <input v-model="imageUpload.isMain" type="checkbox" class="accent-[--color-primary-600]" />
-                Marcar como principal
-              </label>
+              <UiFileInput accept="image/*" size="lg" label="Imagen" @change="onImageFileSelected" />
+              <UiInput v-model="imageUpload.altText" label="Texto alternativo" size="lg" placeholder="Texto alternativo (opcional)" />
+              <FormToggleField v-model="imageUpload.isMain" label="Marcar como principal" size="lg" />
               <UiButton class="w-full" :loading="imageUpload.loading" @click="uploadAndAttachImage">
                 Subir y asociar imagen
               </UiButton>
@@ -498,13 +554,13 @@ const suggestedForDisplay = computed(() => {
               <div
                 v-for="img in sortedImages"
                 :key="img.id"
-                class="aspect-square rounded-lg overflow-hidden bg-[--color-surface-100] relative group"
+                class="aspect-square rounded-lg overflow-hidden bg-surface-100 relative group"
               >
                 <img :src="img.url" :alt="img.altText ?? product.name" class="w-full h-full object-cover" />
 
                 <span
                   v-if="img.isMain"
-                  class="absolute top-1 left-1 badge-base bg-[--color-primary-600] text-white text-xs"
+                  class="absolute top-1 left-1 badge-base bg-primary-600 text-white text-xs"
                 >
                   Principal
                 </span>
@@ -537,64 +593,5 @@ const suggestedForDisplay = computed(() => {
         </UiCard>
       </div>
     </div>
-
-    <UiModal v-if="canManageProducts" :show="variantModal.show" title="Nueva variante" @close="variantModal.show = false">
-      <form @submit.prevent="addVariant" class="space-y-4">
-        <div class="flex flex-col gap-1">
-          <label class="text-sm font-medium text-[--color-surface-700]">SKU *</label>
-          <input :value="variantForm.sku" required class="input-base" placeholder="SHIRT-BLK-M" @input="onVariantSkuInput" />
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-[--color-surface-700]">Talla *</label>
-            <select v-model="variantForm.sizeId" required class="input-base">
-              <option value="" disabled>Seleccionar</option>
-              <option v-for="s in sizes" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-[--color-surface-700]">Color *</label>
-            <select v-model="variantForm.colorId" required class="input-base">
-              <option value="" disabled>Seleccionar</option>
-              <option v-for="c in colors" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-          </div>
-        </div>
-        <div class="flex items-center justify-between gap-3 text-xs text-[--color-surface-500]">
-          <span>Sugerido: {{ variantSkuPreview || 'SIN-SKU' }}</span>
-          <button type="button" class="font-medium text-[--color-primary-700] hover:text-[--color-primary-800]" @click="resetVariantSku">
-            Usar sugerencia
-          </button>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-[--color-surface-700]">Stock *</label>
-            <input v-model.number="variantForm.stock" type="number" min="0" required class="input-base" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-[--color-surface-700]">Precio adicional</label>
-            <input v-model.number="variantForm.additionalPrice" type="number" min="0" step="0.01" class="input-base" />
-          </div>
-        </div>
-      </form>
-      <template #footer>
-        <FormModalActions
-          :loading="variantModal.loading"
-          save-label="Guardar variante"
-          @cancel="variantModal.show = false"
-          @save="addVariant"
-        />
-      </template>
-    </UiModal>
-
-    <UiConfirm
-      v-if="canManageProducts"
-      :show="deleteConfirm.show"
-      title="Eliminar variante"
-      message="¿Eliminar esta variante? El stock se perderá."
-      :loading="deleteConfirm.loading"
-      @confirm="deleteVariant"
-      @cancel="deleteConfirm.show = false"
-    />
   </div>
 </template>

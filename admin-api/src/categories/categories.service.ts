@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { Category } from './entities/category.entity';
+import { Category, CategoryAttributeDefinition } from './entities/category.entity';
 
 // Typed tree node structure for categories
 export interface CategoryTreeNode extends Category {
@@ -39,6 +39,10 @@ export class CategoriesService {
       image: dto.image ?? null,
       isActive: dto.isActive ?? true,
       displayOrder: dto.displayOrder ?? 0,
+      supportsSizeColorVariants: dto.supportsSizeColorVariants ?? true,
+      supportsDimensions: dto.supportsDimensions ?? false,
+      supportsWeight: dto.supportsWeight ?? false,
+      attributeDefinitions: this.normalizeAttributeDefinitions(dto.attributeDefinitions),
       parent,
     });
 
@@ -135,6 +139,22 @@ export class CategoriesService {
       category.displayOrder = dto.displayOrder;
     }
 
+    if (dto.supportsSizeColorVariants !== undefined) {
+      category.supportsSizeColorVariants = dto.supportsSizeColorVariants;
+    }
+
+    if (dto.supportsDimensions !== undefined) {
+      category.supportsDimensions = dto.supportsDimensions;
+    }
+
+    if (dto.supportsWeight !== undefined) {
+      category.supportsWeight = dto.supportsWeight;
+    }
+
+    if (dto.attributeDefinitions !== undefined) {
+      category.attributeDefinitions = this.normalizeAttributeDefinitions(dto.attributeDefinitions);
+    }
+
     return this.categoriesRepository.save(category);
   }
 
@@ -191,5 +211,66 @@ export class CategoriesService {
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-');
+  }
+
+  private normalizeAttributeDefinitions(
+    definitions?: Array<{
+      key: string;
+      label: string;
+      type: 'text' | 'number' | 'boolean' | 'select';
+      unit?: string;
+      required?: boolean;
+      options?: string[];
+      helpText?: string;
+      displayOrder?: number;
+      isActive?: boolean;
+    }>,
+  ): CategoryAttributeDefinition[] {
+    if (!definitions || definitions.length === 0) {
+      return [];
+    }
+
+    const normalized = definitions.map((definition, index) => {
+      const key = this.slugify(definition.key || definition.label);
+      if (!key) {
+        throw new ConflictException('Each dynamic attribute must have a valid key or label');
+      }
+
+      const label = definition.label.trim();
+      if (!label) {
+        throw new ConflictException('Each dynamic attribute must have a label');
+      }
+
+      const options = (definition.options ?? [])
+        .map((option) => option.trim())
+        .filter(Boolean)
+        .filter((option, optionIndex, items) => items.indexOf(option) === optionIndex);
+
+      if (definition.type === 'select' && options.length === 0) {
+        throw new ConflictException(`Attribute "${label}" requires at least one option`);
+      }
+
+      return {
+        key,
+        label,
+        type: definition.type,
+        unit: definition.unit?.trim() || null,
+        required: definition.required ?? false,
+        options: definition.type === 'select' ? options : [],
+        helpText: definition.helpText?.trim() || null,
+        displayOrder: definition.displayOrder ?? index,
+        isActive: definition.isActive ?? true,
+      } satisfies CategoryAttributeDefinition;
+    });
+
+    const duplicatedKeys = normalized
+      .map((definition) => definition.key)
+      .filter((key, index, items) => items.indexOf(key) !== index);
+
+    if (duplicatedKeys.length > 0) {
+      throw new ConflictException(`Dynamic attribute keys must be unique: ${[...new Set(duplicatedKeys)].join(', ')}`);
+    }
+
+    return normalized.sort((left, right) => left.displayOrder - right.displayOrder);
   }
 }

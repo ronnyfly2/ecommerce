@@ -39,7 +39,8 @@ export class CouponsService {
       code: codeUpper,
       type: dto.type,
       value: Number(dto.value).toFixed(2),
-      minOrderAmount: dto.minOrderAmount ? Number(dto.minOrderAmount).toFixed(2) : '0',
+      minOrderAmount:
+        dto.minOrderAmount !== undefined ? Number(dto.minOrderAmount).toFixed(2) : '0.00',
       currencyCode: await this.resolveCurrencyCode(dto.currencyCode),
       maxUsage: dto.maxUsage ?? null,
       startDate: dto.startDate ? new Date(dto.startDate) : null,
@@ -80,8 +81,10 @@ export class CouponsService {
     }
 
     if (dto.type) coupon.type = dto.type;
-    if (dto.value) coupon.value = Number(dto.value).toFixed(2);
-    if (dto.minOrderAmount) coupon.minOrderAmount = Number(dto.minOrderAmount).toFixed(2);
+    if (dto.value !== undefined) coupon.value = Number(dto.value).toFixed(2);
+    if (dto.minOrderAmount !== undefined) {
+      coupon.minOrderAmount = Number(dto.minOrderAmount).toFixed(2);
+    }
     if (dto.currencyCode !== undefined) {
       coupon.currencyCode = await this.resolveCurrencyCode(dto.currencyCode);
     }
@@ -130,7 +133,7 @@ export class CouponsService {
 
     if (minOrderInRequestCurrency > dto.orderAmount) {
       throw new BadRequestException(
-        `Minimum order amount is ${minOrderInRequestCurrency.toFixed(2)} ${orderCurrencyCode}, your order is ${dto.orderAmount}`,
+        `Minimum order amount is ${minOrderInRequestCurrency.toFixed(2)} ${orderCurrencyCode}, your order is ${dto.orderAmount.toFixed(2)}`,
       );
     }
 
@@ -150,7 +153,7 @@ export class CouponsService {
       },
       currencyCode: orderCurrencyCode,
       discount,
-      finalAmount: dto.orderAmount - discount,
+      finalAmount: Number((dto.orderAmount - discount).toFixed(2)),
     };
   }
 

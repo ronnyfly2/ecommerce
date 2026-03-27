@@ -66,8 +66,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(this.roomForAdmin(adminId)).emit('chat.message', message);
   }
 
+  emitNewGroupMessage(memberIds: string[], message: ChatMessage): void {
+    for (const memberId of memberIds) {
+      this.server.to(this.roomForAdmin(memberId)).emit('chat.group.message', message);
+    }
+  }
+
   emitReadReceipt(adminId: string, userId: string): void {
     this.server.to(this.roomForAdmin(adminId)).emit('chat.read', { userId });
+  }
+
+  emitGroupReadReceipt(memberIds: string[], groupId: string, userId: string): void {
+    for (const memberId of memberIds) {
+      this.server.to(this.roomForAdmin(memberId)).emit('chat.group.read', { groupId, userId });
+    }
   }
 
   private roomForAdmin(adminId: string): string {

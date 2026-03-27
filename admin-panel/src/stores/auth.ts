@@ -2,11 +2,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/auth.service'
 import { clearTokens } from '@/services/http'
+import { useNotificationsStore } from '@/stores/notifications'
 import type { User, LoginDto } from '@/types/api'
 import { Role } from '@/types/api'
 import { hasRolePermission, hasRouteAccess, type PermissionKey } from '@/utils/permissions'
 
 export const useAuthStore = defineStore('auth', () => {
+  const notifications = useNotificationsStore()
   const user = ref<User | null>(null)
   const loading = ref(false)
   const initialized = ref(false)
@@ -33,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const { user: me } = await authService.login(dto)
+      notifications.reset()
       user.value = me
     } finally {
       loading.value = false
@@ -44,6 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = await authService.me()
     } catch {
       user.value = null
+      notifications.reset()
     } finally {
       initialized.value = true
     }
@@ -51,10 +55,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     await authService.logout()
+    notifications.reset()
     user.value = null
   }
 
   function reset() {
+    notifications.reset()
     user.value = null
     clearTokens()
   }

@@ -16,7 +16,9 @@ import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiTable from '@/components/ui/UiTable.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { useToast } from '@/composables/useToast'
 import { getSystemCurrencyCode } from '@/utils/system-currency'
 import { useAuthStore } from '@/stores/auth'
@@ -237,24 +239,27 @@ watch(
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    <ListViewToolbar>
+      <template #filters>
         <UiSelect
           v-model="selectedCurrencyCode"
+          size="sm"
           :options="[
             { value: '', label: 'Todas las monedas' },
             ...currencies.map(c => ({ value: c.code, label: `${c.code} (${c.symbol})` })),
           ]"
           class="w-full sm:min-w-55 sm:max-w-xs"
         />
+      </template>
+      <template #actions>
         <UiButton v-if="canManageCoupons" @click="openCreate">
           <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           Nuevo cupón
         </UiButton>
-      </div>
-    </div>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
       <UiTable :data="displayedCoupons" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando cupones..." empty-message="No hay cupones">
@@ -312,27 +317,28 @@ watch(
       size="md"
       @close="formModal.show = false"
     >
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <UiInput v-model="formModal.code" label="Código" required placeholder="SUMMER20" />
-        <UiSelect v-model="formModal.type" label="Tipo" :options="couponTypeOptions" />
+      <FormModalLayout>
+        <UiInput v-model="formModal.code" label="Código" size="lg" required placeholder="SUMMER20" />
+        <UiSelect v-model="formModal.type" label="Tipo" size="lg" :options="couponTypeOptions" />
         <UiSelect
           v-model="formModal.currencyCode"
           label="Moneda"
+          size="lg"
           :options="currencies.map(c => ({ value: c.code, label: `${c.code} (${c.symbol})` }))"
         />
 
-        <UiInput v-model="formModal.value" label="Valor" type="number" min="0" step="0.01" required />
-        <UiInput v-model="formModal.minOrderAmount" label="Monto mínimo" type="number" min="0" step="0.01" />
+        <UiInput v-model="formModal.value" label="Valor" size="lg" type="number" min="0" step="0.01" required />
+        <UiInput v-model="formModal.minOrderAmount" label="Monto mínimo" size="lg" type="number" min="0" step="0.01" />
 
-        <UiInput v-model="formModal.maxUsage" label="Uso máximo" type="number" min="1" placeholder="Sin límite" />
+        <UiInput v-model="formModal.maxUsage" label="Uso máximo" size="lg" type="number" min="1" placeholder="Sin límite" />
 
         <div class="flex items-center pt-7">
           <FormToggleField v-model="formModal.isActive" label="Activo" />
         </div>
 
-        <UiInput v-model="formModal.startDate" label="Fecha inicio" type="date" />
-        <UiInput v-model="formModal.endDate" label="Fecha fin" type="date" />
-      </div>
+        <UiInput v-model="formModal.startDate" label="Fecha inicio" size="lg" type="date" />
+        <UiInput v-model="formModal.endDate" label="Fecha fin" size="lg" type="date" />
+      </FormModalLayout>
 
       <template #footer>
         <FormModalActions :loading="formModal.loading" @cancel="formModal.show = false" @save="saveCoupon" />

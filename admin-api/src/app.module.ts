@@ -25,6 +25,7 @@ import { TagsModule } from './tags/tags.module';
 import { CurrenciesModule } from './currencies/currencies.module';
 import { MeasurementUnitsModule } from './measurement-units/measurement-units.module';
 import { ChatModule } from './chat/chat.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { User } from './users/entities/user.entity';
 
 @Module({
@@ -36,20 +37,25 @@ import { User } from './users/entities/user.entity';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.getOrThrow<string>('DB_HOST'),
-        port: configService.getOrThrow<number>('DB_PORT'),
-        username: configService.getOrThrow<string>('DB_USER'),
-        password: configService.getOrThrow<string>('DB_PASS'),
-        database: configService.getOrThrow<string>('DB_NAME'),
-        entities: [User],
-        autoLoadEntities: true,
-        synchronize: configService.get<boolean>('DB_SYNCHRONIZE', false),
-        ssl: configService.get<boolean>('DB_SSL')
-          ? { rejectUnauthorized: false }
-          : false,
-      }),
+        useFactory: (configService: ConfigService) => {
+          const isDevelopment = configService.get<string>('NODE_ENV') === 'development';
+          const synchronize = configService.get<boolean>('DB_SYNCHRONIZE', isDevelopment);
+
+          return {
+            type: 'postgres',
+            host: configService.getOrThrow<string>('DB_HOST'),
+            port: configService.getOrThrow<number>('DB_PORT'),
+            username: configService.getOrThrow<string>('DB_USER'),
+            password: configService.getOrThrow<string>('DB_PASS'),
+            database: configService.getOrThrow<string>('DB_NAME'),
+            entities: [User],
+            autoLoadEntities: true,
+            synchronize,
+            ssl: configService.get<boolean>('DB_SSL')
+              ? { rejectUnauthorized: false }
+              : false,
+          };
+        },
     }),
     AuthModule,
     UsersModule,
@@ -69,6 +75,7 @@ import { User } from './users/entities/user.entity';
     CurrenciesModule,
     MeasurementUnitsModule,
     ChatModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [

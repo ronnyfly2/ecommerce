@@ -22,8 +22,10 @@
     "migration:run": "ts-node -r tsconfig-paths/register scripts/migrations.ts",
     "migration:revert": "ts-node -r tsconfig-paths/register scripts/migration-revert.ts",
     "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts",
-    "seed:clean": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts",
-    "seed:clean:force": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --force",
+    "seed:clean": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --all",
+    "seed:clean:force": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --seed --force",
+    "seed:clean:seed": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --seed",
+    "seed:clean:seed:force": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --seed --force",
     "seed:clean:users-all": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --users-all",
     "seed:clean:all": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --all"
   },

@@ -75,20 +75,20 @@ describe('Dashboard Metrics', () => {
             outOfStockCount: 2,
             lowStockVariants: [
               {
-                id: 'variant-1',
-                sku: 'TSHIRT-BLK-M',
+                id: 'product-1',
+                sku: 'HOME-TERMO-750',
                 stock: 2,
-                productName: 'Remera Basica',
-                sizeName: 'Medium',
-                colorName: 'Black',
+                productName: 'Termo Expedition 750 ml',
+                categoryName: 'Hidratacion',
+                descriptor: '750 ml · Acero 304',
               },
               {
-                id: 'variant-2',
-                sku: 'HOODIE-NVY-L',
+                id: 'product-2',
+                sku: 'FOOD-CAFE-GEISHA-1KG',
                 stock: 1,
-                productName: 'Hoodie Premium',
-                sizeName: 'Large',
-                colorName: 'Navy',
+                productName: 'Cafe Geisha 1 kg',
+                categoryName: 'Alimentos',
+                descriptor: '1 kg · Tueste medio',
               },
             ],
           },
@@ -149,7 +149,7 @@ describe('Dashboard Metrics', () => {
     cy.contains('Ventas').should('be.visible')
     cy.contains('Stock bajo').should('be.visible')
     cy.contains('Sin stock').should('be.visible')
-    cy.contains('Variantes críticas').should('be.visible')
+    cy.contains('Productos críticos').should('be.visible')
 
     cy.contains('Periodo actual').should('be.visible')
     cy.contains('Periodo anterior').should('be.visible')
@@ -169,8 +169,8 @@ describe('Dashboard Metrics', () => {
     cy.contains('button', '14d').should('be.visible')
     cy.contains('button', '30d').should('be.visible')
 
-    cy.contains('Remera Basica').should('be.visible')
-    cy.contains('TSHIRT-BLK-M').should('be.visible')
-    cy.contains('Hoodie Premium').should('be.visible')
+    cy.contains('Termo Expedition 750 ml').should('be.visible')
+    cy.contains('HOME-TERMO-750').should('be.visible')
+    cy.contains('Cafe Geisha 1 kg').should('be.visible')
   })
 })

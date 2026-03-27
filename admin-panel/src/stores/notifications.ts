@@ -94,6 +94,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
     realtimeConnected.value = false
   }
 
+  function reset() {
+    stopRealtime()
+    items.value = []
+    unreadCount.value = 0
+    loading.value = false
+    initialized.value = false
+    activeTypeFilter.value = ''
+  }
+
   async function markAsRead(id: string) {
     const target = items.value.find((item) => item.id === id)
     if (!target || target.isRead) {
@@ -132,6 +141,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     setTypeFilter,
     startRealtime,
     stopRealtime,
+    reset,
     markAsRead,
     markAllAsRead,
   }

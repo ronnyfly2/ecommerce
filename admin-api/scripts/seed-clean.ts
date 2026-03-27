@@ -1,14 +1,38 @@
 import { In } from 'typeorm';
 import { AppDataSource } from '../src/data-source';
-import { User } from '../src/users/entities/user.entity';
-import { Size } from '../src/sizes/entities/size.entity';
-import { Color } from '../src/colors/entities/color.entity';
 import { Category } from '../src/categories/entities/category.entity';
+import { Color } from '../src/colors/entities/color.entity';
+import { Coupon } from '../src/coupons/entities/coupon.entity';
+import { CouponUsage } from '../src/coupons/entities/coupon-usage.entity';
+import { InventoryMovement } from '../src/inventory/entities/inventory-movement.entity';
+import { Notification } from '../src/notifications/entities/notification.entity';
+import { Order } from '../src/orders/entities/order.entity';
+import { Product } from '../src/products/entities/product.entity';
 import { ProductVariant } from '../src/products/entities/product-variant.entity';
+import { Size } from '../src/sizes/entities/size.entity';
+import { Tag } from '../src/tags/entities/tag.entity';
+import { User } from '../src/users/entities/user.entity';
+import {
+  resolveSeedUserEmails,
+  SEED_CATEGORY_SLUGS,
+  SEED_COUPON_CODES,
+  SEED_NOTE_PREFIX,
+  SEED_PRODUCT_SKUS,
+  SEED_REASON_PREFIX,
+  SEED_SCOPE,
+  SEED_SIZE_ABBREVIATIONS,
+  SEED_COLOR_NAMES,
+  SEED_TAG_SLUGS,
+  SEED_VARIANT_SKUS,
+} from './seed-data';
 
 type CleanMode = 'seed' | 'users-all' | 'all';
 
 function resolveCleanMode(): CleanMode {
+  if (process.argv.includes('--seed')) {
+    return 'seed';
+  }
+
   if (process.argv.includes('--all')) {
     return 'all';
   }
@@ -17,181 +41,276 @@ function resolveCleanMode(): CleanMode {
     return 'users-all';
   }
 
-  return 'seed';
+  return 'all';
 }
 
 async function cleanSeed() {
+  const startedAt = new Date();
+  const startTimeMs = Date.now();
+
   try {
     await AppDataSource.initialize();
     console.log('✓ Database connected');
 
     const mode = resolveCleanMode();
-    const forceMode =
-      process.argv.includes('--force') || process.env.SEED_CLEAN_FORCE === 'true';
+    const forceMode = process.argv.includes('--force') || process.env.SEED_CLEAN_FORCE === 'true';
 
     if (mode === 'all') {
-      const tables: Array<{ tablename: string }> = await AppDataSource.query(
-        `
-          SELECT tablename
-          FROM pg_tables
-          WHERE schemaname = 'public'
-            AND tablename <> 'migrations'
-        `,
-      );
+      const tables: Array<{ tablename: string }> = await AppDataSource.query(`
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename <> 'migrations'
+      `);
 
       const tableNames = tables.map((table) => table.tablename);
-      if (tableNames.length === 0) {
-        console.log('ℹ No public tables found to truncate');
-      } else {
-        const quotedTables = tableNames
-          .map((tableName) => `"public"."${tableName}"`)
-          .join(', ');
-        await AppDataSource.query(
-          `TRUNCATE TABLE ${quotedTables} RESTART IDENTITY CASCADE`,
-        );
+      if (tableNames.length > 0) {
+        const quotedTables = tableNames.map((tableName) => `"public"."${tableName}"`).join(', ');
+        await AppDataSource.query(`TRUNCATE TABLE ${quotedTables} RESTART IDENTITY CASCADE`);
       }
 
+      const finishedAt = new Date();
+      const durationMs = Date.now() - startTimeMs;
       console.log('\n🧹 Database cleanup summary:');
       console.log(`- Mode: ${mode}`);
+      console.log(`- Started at: ${startedAt.toISOString()}`);
+      console.log(`- Finished at: ${finishedAt.toISOString()}`);
+      console.log(`- Duration (ms): ${durationMs}`);
       console.log(`- Tables truncated: ${tableNames.length}`);
+      console.log('- Skipped tables: migrations');
       console.log('\n✅ Database cleanup completed');
       process.exit(0);
     }
 
     if (mode === 'users-all') {
       const userTableName = AppDataSource.getRepository(User).metadata.tableName;
-      await AppDataSource.query(
-        `TRUNCATE TABLE "public"."${userTableName}" RESTART IDENTITY CASCADE`,
-      );
+      await AppDataSource.query(`TRUNCATE TABLE "public"."${userTableName}" RESTART IDENTITY CASCADE`);
 
+      const finishedAt = new Date();
+      const durationMs = Date.now() - startTimeMs;
       console.log('\n🧹 Database cleanup summary:');
       console.log(`- Mode: ${mode}`);
+      console.log(`- Started at: ${startedAt.toISOString()}`);
+      console.log(`- Finished at: ${finishedAt.toISOString()}`);
+      console.log(`- Duration (ms): ${durationMs}`);
       console.log('- Users table truncated with CASCADE');
       console.log('\n✅ Database cleanup completed');
       process.exit(0);
     }
 
-    const seedUserEmails = [
-      process.env.SEED_SUPER_ADMIN_EMAIL ?? 'superadmin@local.dev',
-      'superadmin2@local.dev',
-      process.env.SEED_ADMIN_EMAIL ?? 'admin@local.dev',
-      'admin2@local.dev',
-      'admin3@local.dev',
-      'customer1@local.dev',
-      'customer2@local.dev',
-      'customer3@local.dev',
-    ];
-
-    const seedSizeAbbreviations = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-    const seedColorNames = ['Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Gray', 'Navy'];
-
-    // All slugs seeded by the category seed, ordered leaves → branches → roots
-    const seedCategorySlugs = [
-      // L3 – Cuello Circular
-      'polos-cuello-circular-jersey-20-1',
-      'polos-cuello-circular-jersey-30-1',
-      'polos-cuello-circular-high-cotton-14-1',
-      'polos-cuello-circular-pima-40-1',
-      'polos-cuello-circular-cotton-32-1',
-      // L3 – Cuello V
-      'polos-cuello-v-jersey-20-1',
-      'polos-cuello-v-jersey-30-1',
-      'polos-cuello-v-high-cotton-14-1',
-      'polos-cuello-v-pima-40-1',
-      'polos-cuello-v-cotton-32-1',
-      // L3 – Cuello Polo
-      'polos-cuello-polo-jersey-20-1',
-      'polos-cuello-polo-jersey-30-1',
-      'polos-cuello-polo-high-cotton-14-1',
-      'polos-cuello-polo-pima-40-1',
-      'polos-cuello-polo-cotton-32-1',
-      // L2
-      'polos-cuello-circular',
-      'polos-cuello-v',
-      'polos-cuello-polo',
-      // L1
-      'polos-t-shirts',
-    ];
-
     const userRepository = AppDataSource.getRepository(User);
     const sizeRepository = AppDataSource.getRepository(Size);
     const colorRepository = AppDataSource.getRepository(Color);
     const categoryRepository = AppDataSource.getRepository(Category);
+    const productRepository = AppDataSource.getRepository(Product);
     const variantRepository = AppDataSource.getRepository(ProductVariant);
+    const tagRepository = AppDataSource.getRepository(Tag);
+    const couponRepository = AppDataSource.getRepository(Coupon);
+    const couponUsageRepository = AppDataSource.getRepository(CouponUsage);
+    const orderRepository = AppDataSource.getRepository(Order);
+    const inventoryRepository = AppDataSource.getRepository(InventoryMovement);
+    const notificationRepository = AppDataSource.getRepository(Notification);
 
-    const usersToDelete = await userRepository.find({
-      where: { email: In(seedUserEmails) },
-    });
+    const seedUsers = await userRepository.find({ where: { email: In(resolveSeedUserEmails()) } });
+    const seedProducts = await productRepository.find({ where: { sku: In(SEED_PRODUCT_SKUS) } });
+    const seedVariants = await variantRepository.find({ where: { sku: In(SEED_VARIANT_SKUS) } });
+    const seedCoupons = await couponRepository.find({ where: { code: In(SEED_COUPON_CODES) } });
+    const seedTags = await tagRepository.find({ where: { slug: In(SEED_TAG_SLUGS) } });
+    const sizesToDelete = await sizeRepository.find({ where: { abbreviation: In(SEED_SIZE_ABBREVIATIONS) } });
+    const colorsToDelete = await colorRepository.find({ where: { name: In(SEED_COLOR_NAMES) } });
 
-    let deletedUsers = 0;
-    if (usersToDelete.length > 0) {
-      await userRepository.remove(usersToDelete);
-      deletedUsers = usersToDelete.length;
-    }
-
-    const sizesToDelete = await sizeRepository.find({
-      where: { abbreviation: In(seedSizeAbbreviations) },
-    });
-
+    const seedUserIds = seedUsers.map((user) => user.id);
+    const seedProductIds = seedProducts.map((product) => product.id);
+    const seedVariantIds = seedVariants.map((variant) => variant.id);
+    const seedCouponIds = seedCoupons.map((coupon) => coupon.id);
+    const seedTagIds = seedTags.map((tag) => tag.id);
     const seedSizeIds = sizesToDelete.map((size) => size.id);
-    const colorsToDelete = await colorRepository.find({
-      where: { name: In(seedColorNames) },
-    });
-
     const seedColorIds = colorsToDelete.map((color) => color.id);
 
-    let forceDeletedVariants = 0;
+    await notificationRepository
+      .createQueryBuilder()
+      .delete()
+      .from(Notification)
+      .where("metadata ->> 'seedScope' = :seedScope", { seedScope: SEED_SCOPE })
+      .execute();
+
+    await inventoryRepository
+      .createQueryBuilder()
+      .delete()
+      .from(InventoryMovement)
+      .where('reason LIKE :reasonPrefix', { reasonPrefix: `${SEED_REASON_PREFIX}%` })
+      .execute();
+
+    const seedOrderIds = (
+      await orderRepository
+        .createQueryBuilder('order')
+        .select('order.id', 'id')
+        .where('order.notes LIKE :notePrefix', { notePrefix: `${SEED_NOTE_PREFIX}%` })
+        .getRawMany<{ id: string }>()
+    ).map((row) => row.id);
+
+    if (seedOrderIds.length > 0) {
+      await couponUsageRepository
+        .createQueryBuilder()
+        .delete()
+        .from(CouponUsage)
+        .where('order_id IN (:...orderIds)', { orderIds: seedOrderIds })
+        .execute();
+
+      await orderRepository
+        .createQueryBuilder()
+        .delete()
+        .from(Order)
+        .where('id IN (:...orderIds)', { orderIds: seedOrderIds })
+        .execute();
+    }
+
+    if (seedCouponIds.length > 0) {
+      await couponUsageRepository
+        .createQueryBuilder()
+        .delete()
+        .from(CouponUsage)
+        .where('coupon_id IN (:...couponIds)', { couponIds: seedCouponIds })
+        .execute();
+    }
+
+    const blockedExternalOrderItems =
+      seedProductIds.length > 0 || seedVariantIds.length > 0
+        ? await AppDataSource.query(
+            `
+              SELECT COUNT(*)::int AS count
+              FROM order_items oi
+              LEFT JOIN orders o ON o.id = oi.order_id
+              WHERE (
+                ($1::uuid[] <> '{}'::uuid[] AND oi.product_id = ANY($1))
+                OR ($2::uuid[] <> '{}'::uuid[] AND oi.variant_id = ANY($2))
+              )
+                AND (o.id IS NULL OR o.notes NOT LIKE $3)
+            `,
+            [seedProductIds, seedVariantIds, `${SEED_NOTE_PREFIX}%`],
+          )
+        : [{ count: 0 }];
+
+    const blockedExternalInventory =
+      seedProductIds.length > 0 || seedVariantIds.length > 0
+        ? await AppDataSource.query(
+            `
+              SELECT COUNT(*)::int AS count
+              FROM inventory_movements im
+              WHERE (
+                ($1::uuid[] <> '{}'::uuid[] AND im.product_id = ANY($1))
+                OR ($2::uuid[] <> '{}'::uuid[] AND im.variant_id = ANY($2))
+              )
+                AND (im.reason IS NULL OR im.reason NOT LIKE $3)
+            `,
+            [seedProductIds, seedVariantIds, `${SEED_REASON_PREFIX}%`],
+          )
+        : [{ count: 0 }];
+
+    const blockedCouponOrders =
+      seedCouponIds.length > 0
+        ? await AppDataSource.query(
+            `
+              SELECT COUNT(*)::int AS count
+              FROM orders
+              WHERE coupon_id = ANY($1)
+                AND notes NOT LIKE $2
+            `,
+            [seedCouponIds, `${SEED_NOTE_PREFIX}%`],
+          )
+        : [{ count: 0 }];
+
+    const blockedUserOrders =
+      seedUserIds.length > 0
+        ? await AppDataSource.query(
+            `
+              SELECT COUNT(*)::int AS count
+              FROM orders
+              WHERE user_id = ANY($1)
+                AND notes NOT LIKE $2
+            `,
+            [seedUserIds, `${SEED_NOTE_PREFIX}%`],
+          )
+        : [{ count: 0 }];
+
+    const blockedExternalOrderItemsCount = Number(blockedExternalOrderItems[0]?.count ?? 0);
+    const blockedExternalInventoryCount = Number(blockedExternalInventory[0]?.count ?? 0);
+    const blockedCouponOrdersCount = Number(blockedCouponOrders[0]?.count ?? 0);
+    const blockedUserOrdersCount = Number(blockedUserOrders[0]?.count ?? 0);
+
     let forceDeletedOrderItems = 0;
     let forceDeletedInventoryMovements = 0;
+    let deletedProducts = 0;
+    let deletedCoupons = 0;
+    let deletedTags = 0;
+    let deletedCategories = 0;
 
-    const variantIdsToDelete =
-      seedSizeIds.length > 0 || seedColorIds.length > 0
-        ? (
-            await variantRepository
-              .createQueryBuilder('variant')
-              .select('variant.id', 'id')
-              .where(
-                seedSizeIds.length > 0
-                  ? 'variant.size_id IN (:...sizeIds)'
-                  : '1=0',
-                { sizeIds: seedSizeIds },
-              )
-              .orWhere(
-                seedColorIds.length > 0
-                  ? 'variant.color_id IN (:...colorIds)'
-                  : '1=0',
-                { colorIds: seedColorIds },
-              )
-              .getRawMany<{ id: string }>()
-          ).map((row) => row.id)
-        : [];
+    if (forceMode && (seedProductIds.length > 0 || seedVariantIds.length > 0)) {
+      const deletedOrderItems = await AppDataSource.query(
+        `
+          DELETE FROM order_items
+          WHERE ($1::uuid[] <> '{}'::uuid[] AND product_id = ANY($1))
+             OR ($2::uuid[] <> '{}'::uuid[] AND variant_id = ANY($2))
+          RETURNING id
+        `,
+        [seedProductIds, seedVariantIds],
+      );
+      forceDeletedOrderItems = deletedOrderItems.length;
 
-    if (forceMode && variantIdsToDelete.length > 0) {
-      await AppDataSource.transaction(async (manager) => {
-        const deleteOrderItemsResult = await manager
-          .createQueryBuilder()
-          .delete()
-          .from('order_items')
-          .where('variant_id IN (:...variantIds)', { variantIds: variantIdsToDelete })
-          .execute();
-        forceDeletedOrderItems = deleteOrderItemsResult.affected ?? 0;
+      const deletedInventory = await AppDataSource.query(
+        `
+          DELETE FROM inventory_movements
+          WHERE ($1::uuid[] <> '{}'::uuid[] AND product_id = ANY($1))
+             OR ($2::uuid[] <> '{}'::uuid[] AND variant_id = ANY($2))
+          RETURNING id
+        `,
+        [seedProductIds, seedVariantIds],
+      );
+      forceDeletedInventoryMovements = deletedInventory.length;
+    }
 
-        const deleteInventoryMovementsResult = await manager
-          .createQueryBuilder()
-          .delete()
-          .from('inventory_movements')
-          .where('variant_id IN (:...variantIds)', { variantIds: variantIdsToDelete })
-          .execute();
-        forceDeletedInventoryMovements = deleteInventoryMovementsResult.affected ?? 0;
+    const canDeleteProducts =
+      seedProducts.length > 0 &&
+      (forceMode || (blockedExternalOrderItemsCount === 0 && blockedExternalInventoryCount === 0));
 
-        const deleteVariantsResult = await manager
-          .createQueryBuilder()
-          .delete()
-          .from(ProductVariant)
-          .where('id IN (:...variantIds)', { variantIds: variantIdsToDelete })
-          .execute();
-        forceDeletedVariants = deleteVariantsResult.affected ?? 0;
+    if (canDeleteProducts) {
+      await AppDataSource.query(`DELETE FROM product_tags WHERE product_id = ANY($1)`, [seedProductIds]);
+      await productRepository.remove(seedProducts);
+      deletedProducts = seedProducts.length;
+    }
+
+    if (seedCoupons.length > 0 && (forceMode || blockedCouponOrdersCount === 0)) {
+      await couponRepository.remove(seedCoupons);
+      deletedCoupons = seedCoupons.length;
+    }
+
+    if (seedTagIds.length > 0) {
+      const tagLinks = await AppDataSource.query(
+        `SELECT COUNT(*)::int AS count FROM product_tags WHERE tag_id = ANY($1)`,
+        [seedTagIds],
+      );
+      const blockedTagLinksCount = Number(tagLinks[0]?.count ?? 0);
+
+      if (blockedTagLinksCount === 0) {
+        await tagRepository.remove(seedTags);
+        deletedTags = seedTags.length;
+      }
+    }
+
+    for (const slug of SEED_CATEGORY_SLUGS) {
+      const category = await categoryRepository.findOne({ where: { slug } });
+      if (!category) {
+        continue;
+      }
+
+      const blockingProducts = await productRepository.count({
+        where: { category: { id: category.id } },
       });
+
+      if (blockingProducts === 0) {
+        await categoryRepository.remove(category);
+        deletedCategories += 1;
+      }
     }
 
     let blockedSizeCount = 0;
@@ -222,44 +341,59 @@ async function cleanSeed() {
       deletedColors = colorsToDelete.length;
     }
 
-    // Remove seed categories in leaf-first order so SET NULL cascade doesn't leave orphans
-    let deletedCategories = 0;
-    for (const slug of seedCategorySlugs) {
-      const cat = await categoryRepository.findOne({ where: { slug } });
-      if (cat) {
-        await categoryRepository.remove(cat);
-        deletedCategories++;
-      }
+    let deletedUsers = 0;
+    if (seedUsers.length > 0 && (forceMode || blockedUserOrdersCount === 0)) {
+      await userRepository.remove(seedUsers);
+      deletedUsers = seedUsers.length;
     }
 
     console.log('\n🧹 Seed cleanup summary:');
+    console.log(`- Scope: ${SEED_SCOPE}`);
     console.log(`- Mode: ${forceMode ? 'seed-force' : 'seed-safe'}`);
-    console.log(`- Users deleted: ${deletedUsers}`);
-    console.log(`- Variants deleted: ${forceDeletedVariants}`);
-    console.log(`- Inventory movements deleted: ${forceDeletedInventoryMovements}`);
-    console.log(`- Order items deleted: ${forceDeletedOrderItems}`);
+    console.log(`- Seed orders deleted: ${seedOrderIds.length}`);
+    console.log(`- Force deleted order items: ${forceDeletedOrderItems}`);
+    console.log(`- Force deleted inventory movements: ${forceDeletedInventoryMovements}`);
+    console.log(`- Products deleted: ${deletedProducts}`);
+    console.log(`- Coupons deleted: ${deletedCoupons}`);
+    console.log(`- Tags deleted: ${deletedTags}`);
+    console.log(`- Categories deleted: ${deletedCategories}`);
     console.log(`- Sizes deleted: ${deletedSizes}`);
     console.log(`- Colors deleted: ${deletedColors}`);
-    console.log(`- Categories deleted: ${deletedCategories}`);
+    console.log(`- Users deleted: ${deletedUsers}`);
+
+    if (!forceMode && blockedExternalOrderItemsCount > 0) {
+      console.log(`- Seed products kept: dependencies in ${blockedExternalOrderItemsCount} non-seed order items`);
+    }
+
+    if (!forceMode && blockedExternalInventoryCount > 0) {
+      console.log(`- Seed products kept: dependencies in ${blockedExternalInventoryCount} non-seed inventory movements`);
+    }
+
+    if (!forceMode && blockedCouponOrdersCount > 0) {
+      console.log(`- Seed coupons kept: referenced by ${blockedCouponOrdersCount} non-seed orders`);
+    }
+
+    if (!forceMode && blockedUserOrdersCount > 0) {
+      console.log(`- Seed users kept: referenced by ${blockedUserOrdersCount} non-seed orders`);
+    }
 
     if (blockedSizeCount > 0) {
-      console.log(
-        `- Sizes not deleted: ${sizesToDelete.length} (in use by ${blockedSizeCount} product variants)`,
-      );
+      console.log(`- Sizes not deleted: ${sizesToDelete.length} (in use by ${blockedSizeCount} product variants)`);
     }
 
     if (blockedColorCount > 0) {
-      console.log(
-        `- Colors not deleted: ${colorsToDelete.length} (in use by ${blockedColorCount} product variants)`,
-      );
+      console.log(`- Colors not deleted: ${colorsToDelete.length} (in use by ${blockedColorCount} product variants)`);
     }
 
-    if (!forceMode && variantIdsToDelete.length > 0) {
-      console.log(
-        '- Tip: run with --force (or npm run seed:clean:force) to remove blocking variants and dependencies.',
-      );
+    if (!forceMode && (blockedExternalOrderItemsCount > 0 || blockedExternalInventoryCount > 0)) {
+      console.log('- Tip: run with --force to remove remaining dependencies linked to seeded products.');
     }
 
+    const finishedAt = new Date();
+    const durationMs = Date.now() - startTimeMs;
+    console.log(`- Started at: ${startedAt.toISOString()}`);
+    console.log(`- Finished at: ${finishedAt.toISOString()}`);
+    console.log(`- Duration (ms): ${durationMs}`);
     console.log('\n✅ Seed cleanup completed');
     process.exit(0);
   } catch (error) {
@@ -268,4 +402,4 @@ async function cleanSeed() {
   }
 }
 
-cleanSeed();
+void cleanSeed();

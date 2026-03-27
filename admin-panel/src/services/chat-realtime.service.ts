@@ -7,6 +7,8 @@ const WS_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '')
 type ChatRealtimeEvents = {
   onMessage: (message: ChatMessage) => void
   onReadReceipt: (payload: { userId: string }) => void
+  onGroupMessage: (message: ChatMessage) => void
+  onGroupReadReceipt: (payload: { groupId: string; userId: string }) => void
 }
 
 let socket: Socket | null = null
@@ -25,6 +27,8 @@ export function connectChatRealtime(token: string, events: ChatRealtimeEvents): 
 
   socket.on('chat.message', events.onMessage)
   socket.on('chat.read', events.onReadReceipt)
+  socket.on('chat.group.message', events.onGroupMessage)
+  socket.on('chat.group.read', events.onGroupReadReceipt)
 
   return socket
 }

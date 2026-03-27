@@ -12,6 +12,7 @@ import { User } from '../users/entities/user.entity';
 import { Size } from '../sizes/entities/size.entity';
 import { Color } from '../colors/entities/color.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
+import { Currency } from '../currencies/entities/currency.entity';
 import { CleanSeedDto, SeedCleanMode } from './dto/clean-seed.dto';
 
 @Injectable()
@@ -23,6 +24,8 @@ export class AdminToolsService {
     private readonly sizeRepository: Repository<Size>,
     @InjectRepository(Color)
     private readonly colorRepository: Repository<Color>,
+    @InjectRepository(Currency)
+    private readonly currencyRepository: Repository<Currency>,
     @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
     private readonly dataSource: DataSource,
@@ -247,11 +250,86 @@ export class AdminToolsService {
       }
     }
 
+    const seedCurrencies = [
+      {
+        code: 'USD',
+        name: 'Dolares estadounidenses',
+        symbol: '$',
+        exchangeRateToUsd: '1.000000',
+        isActive: true,
+        isDefault: true,
+      },
+      {
+        code: 'PEN',
+        name: 'Soles peruanos',
+        symbol: 'S/',
+        exchangeRateToUsd: '3.750000',
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        code: 'MXN',
+        name: 'Pesos mexicanos',
+        symbol: '$',
+        exchangeRateToUsd: '17.000000',
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        code: 'COP',
+        name: 'Pesos colombianos',
+        symbol: '$',
+        exchangeRateToUsd: '3900.000000',
+        isActive: true,
+        isDefault: false,
+      },
+      {
+        code: 'CLP',
+        name: 'Pesos chilenos',
+        symbol: '$',
+        exchangeRateToUsd: '950.000000',
+        isActive: true,
+        isDefault: false,
+      },
+    ];
+
+    let createdCurrencies = 0;
+    let updatedCurrencies = 0;
+    for (const currencyData of seedCurrencies) {
+      const existingCurrency = await this.currencyRepository.findOne({
+        where: { code: currencyData.code },
+      });
+
+      if (!existingCurrency) {
+        const currency = this.currencyRepository.create(currencyData);
+        await this.currencyRepository.save(currency);
+        createdCurrencies += 1;
+        continue;
+      }
+
+      existingCurrency.name = currencyData.name;
+      existingCurrency.symbol = currencyData.symbol;
+      existingCurrency.exchangeRateToUsd = currencyData.exchangeRateToUsd;
+      existingCurrency.isActive = currencyData.isActive;
+      existingCurrency.isDefault = currencyData.isDefault;
+      await this.currencyRepository.save(existingCurrency);
+      updatedCurrencies += 1;
+    }
+
+    await this.currencyRepository
+      .createQueryBuilder()
+      .update(Currency)
+      .set({ isDefault: false })
+      .where('code <> :defaultCode', { defaultCode: 'USD' })
+      .execute();
+
     return {
       mode: 'seed-run',
       users: userResults,
       createdSizes,
       createdColors,
+      createdCurrencies,
+      updatedCurrencies,
       credentials: {
         superAdmin: {
           password: superAdminRawPassword,
@@ -271,6 +349,9 @@ export class AdminToolsService {
 
   async cleanSeed(dto: CleanSeedDto, confirmationPhrase?: string) {
     this.assertEnabled();
+
+    const startedAt = new Date();
+    const startTimeMs = Date.now();
 
     const mode = dto.mode ?? SeedCleanMode.SEED;
     const forceMode = dto.force ?? false;
@@ -294,9 +375,16 @@ export class AdminToolsService {
         );
       }
 
+      const finishedAt = new Date();
+
       return {
         mode,
+        startedAt: startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
+        durationMs: Date.now() - startTimeMs,
         tablesTruncated: tableNames.length,
+        skippedTables: ['migrations'],
+        truncatedTables: tableNames.sort((a, b) => a.localeCompare(b)),
       };
     }
 

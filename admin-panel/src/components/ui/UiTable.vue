@@ -27,11 +27,11 @@ const isEmpty = computed(() => {
 
 const loadingToneClass = computed(() => {
   const tones: Record<LoadingColor, string> = {
-    primary: 'bg-[--color-primary-600]',
-    info: 'bg-[--color-info-600]',
-    success: 'bg-[--color-success-600]',
-    danger: 'bg-[--color-danger-600]',
-    neutral: 'bg-[--color-surface-700]',
+    primary: 'bg-primary-600',
+    info: 'bg-info-600',
+    success: 'bg-success-600',
+    danger: 'bg-danger-600',
+    neutral: 'bg-surface-700',
   }
 
   return tones[props.loadingColor]
@@ -59,7 +59,7 @@ const loadingToneClass = computed(() => {
     v-else-if="isEmpty"
     class="flex flex-col items-center justify-center py-16 text-center"
   >
-    <svg class="w-12 h-12 text-[--color-primary-800] mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <svg class="w-12 h-12 text-primary-800 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
     </svg>
     <p class="text-muted">{{ emptyMessage ?? 'No hay resultados' }}</p>
@@ -72,7 +72,7 @@ const loadingToneClass = computed(() => {
   <div
     v-else
     :class="[
-      'overflow-x-auto border border-[--color-surface-200] bg-[--color-surface-0] shadow-(--shadow-xs)',
+      'overflow-x-auto border border-surface-200 bg-surface-0 shadow-(--shadow-xs)',
       compact ? 'rounded-lg' : 'rounded-xl',
     ]"
   >

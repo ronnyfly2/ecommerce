@@ -15,14 +15,14 @@ function onToggle() {
 <template>
   <button
     type="button"
-    class="inline-flex items-center gap-1.5 font-inherit text-inherit hover:text-[--color-surface-700] transition-colors"
+    class="inline-flex items-center gap-1.5 font-inherit text-inherit hover:text-surface-700 transition-colors"
     @click="onToggle"
   >
     <span>{{ label }}</span>
     <span class="inline-flex flex-col leading-none -space-y-0.5">
       <svg
         class="w-2.5 h-2.5"
-        :class="active && direction === 'asc' ? 'text-[--color-primary-600]' : 'text-[--color-surface-300]'"
+        :class="active && direction === 'asc' ? 'text-primary-600' : 'text-surface-300'"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 20 20"
         fill="currentColor"
@@ -32,7 +32,7 @@ function onToggle() {
       </svg>
       <svg
         class="w-2.5 h-2.5"
-        :class="active && direction === 'desc' ? 'text-[--color-primary-600]' : 'text-[--color-surface-300]'"
+        :class="active && direction === 'desc' ? 'text-primary-600' : 'text-surface-300'"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 20 20"
         fill="currentColor"

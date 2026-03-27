@@ -31,7 +31,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[--color-surface-100] flex items-center justify-center p-4">
+  <div class="min-h-screen bg-surface-100 flex items-center justify-center p-4">
     <UiToastContainer />
 
     <div class="w-full max-w-md card p-6 space-y-4">
@@ -48,16 +48,17 @@ async function submit() {
           v-model="form.email"
           type="email"
           label="Email"
+          size="lg"
           autocomplete="email"
           placeholder="admin@tienda.com"
           required
         />
 
-        <div v-if="successMessage" class="text-sm text-[--color-success-700] bg-[--color-success-50] rounded-lg px-3 py-2">
+        <div v-if="successMessage" class="text-sm text-success-700 bg-success-50 rounded-lg px-3 py-2" role="status" aria-live="polite">
           {{ successMessage }}
         </div>
 
-        <div v-if="error" class="text-sm text-[--color-danger-600] bg-[--color-danger-50] rounded-lg px-3 py-2">
+        <div v-if="error" class="text-sm text-danger-700 bg-danger-50 rounded-lg px-3 py-2" role="alert" aria-live="assertive">
           {{ error }}
         </div>
 
@@ -66,10 +67,10 @@ async function submit() {
         </UiButton>
       </form>
 
-      <div class="flex justify-between items-center pt-2 border-t border-[--color-surface-200]">
+      <div class="flex justify-between items-center pt-2 border-t border-surface-200">
         <button
           type="button"
-          class="text-sm text-[--color-primary-700] hover:text-[--color-primary-800]"
+          class="text-sm text-primary-700 hover:text-primary-800"
           @click="router.push({ name: 'login' })"
         >
           Volver al login

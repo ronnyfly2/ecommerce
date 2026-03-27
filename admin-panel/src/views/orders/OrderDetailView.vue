@@ -51,6 +51,22 @@ function fmt(n: string | number, currencyCode = order.value?.currencyCode || get
   return formatMoney(n, currencyCode)
 }
 
+function orderItemName(item: Order['items'][number]) {
+  return item.product?.name ?? item.variant?.product?.name ?? item.snapshotProductName ?? 'Producto'
+}
+
+function orderItemSku(item: Order['items'][number]) {
+  return item.variant?.sku ?? item.product?.sku ?? item.snapshotSku ?? 'SIN-SKU'
+}
+
+function orderItemDescriptor(item: Order['items'][number]) {
+  if (item.variant) {
+    return `${item.variant.size.name} / ${item.variant.color.name}`
+  }
+
+  return item.snapshotDescriptor ?? 'Producto directo'
+}
+
 async function load() {
   loading.value = true
   try {
@@ -105,13 +121,13 @@ onMounted(load)
           <div
             v-for="item in order.items"
             :key="item.id"
-            class="p-4 rounded-lg border border-[--color-surface-200] bg-[--color-surface-50]"
+            class="p-4 rounded-lg border border-surface-200 bg-surface-50"
           >
             <div class="flex items-start justify-between gap-3">
               <div>
-                <p class="font-medium text-[--color-surface-900]">{{ item.variant.product?.name ?? 'Producto' }}</p>
-                <p class="text-xs text-muted">SKU: {{ item.variant.sku }}</p>
-                <p class="text-xs text-muted">{{ item.variant.size.name }} / {{ item.variant.color.name }}</p>
+                <p class="font-medium text-surface-900">{{ orderItemName(item) }}</p>
+                <p class="text-xs text-muted">SKU: {{ orderItemSku(item) }}</p>
+                <p class="text-xs text-muted">{{ orderItemDescriptor(item) }}</p>
               </div>
               <div class="text-right">
                 <p class="text-sm">x{{ item.quantity }}</p>
@@ -155,6 +171,7 @@ onMounted(load)
           <UiSelect
             v-model="selectedStatus"
             label="Cambiar estado"
+            size="lg"
             :options="statusOptions"
           />
 
@@ -167,7 +184,7 @@ onMounted(load)
     </div>
 
     <UiCard title="Dirección de envío">
-      <div v-if="order.shippingAddresses?.length" class="text-sm text-[--color-surface-700]">
+      <div v-if="order.shippingAddresses?.length" class="text-sm text-surface-700">
         <p class="font-medium">
           {{ order.shippingAddresses[0].firstName }} {{ order.shippingAddresses[0].lastName }}
         </p>

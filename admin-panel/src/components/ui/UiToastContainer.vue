@@ -8,8 +8,12 @@ const store = useToastStore()
 <template>
   <Teleport to="body">
     <div
-      class="fixed bottom-4 right-4 flex flex-col gap-2 z-[--z-toast]"
+      class="fixed bottom-4 right-4 flex flex-col gap-2 z-[var(--z-toast)]"
       style="z-index: var(--z-toast)"
+      role="region"
+      aria-label="Notificaciones emergentes"
+      aria-live="polite"
+      aria-relevant="additions text"
     >
       <TransitionGroup name="slide-up">
         <UiToast

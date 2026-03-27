@@ -12,6 +12,7 @@ import type {
 import UiCard from '@/components/ui/UiCard.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
+import UiInput from '@/components/ui/UiInput.vue'
 import UiTable from '@/components/ui/UiTable.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
@@ -331,7 +332,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-else-if="sales" class="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <div v-else-if="sales" class="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr] p-4">
         <div class="min-w-0">
           <div class="mb-6 flex flex-col gap-4">
             <div class="flex flex-wrap items-center gap-3">
@@ -341,26 +342,26 @@ onMounted(async () => {
                 type="button"
                 class="rounded-full border px-4 py-2 text-xs font-semibold transition"
                 :class="option.id === salesPreset
-                  ? 'border-[--color-primary-600] bg-[--color-primary-600] text-white'
-                  : 'border-[--color-surface-300] text-[--color-surface-700] hover:border-[--color-primary-400] hover:text-[--color-primary-700]'"
+                  ? 'border-primary-600 bg-primary-600 text-white'
+                  : 'border-surface-300 text-surface-700 hover:border-primary-400 hover:text-primary-700'"
                 @click="salesPreset = option.id"
               >
                 {{ option.label }}
               </button>
             </div>
 
-            <div v-if="salesPreset === 'month'" class="rounded-2xl border border-[--color-surface-200] bg-[--color-surface-50] p-4 sm:p-5">
+            <div v-if="salesPreset === 'month'" class="rounded-2xl border border-surface-200 bg-surface-50 p-4 sm:p-5">
               <div class="mb-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  class="rounded-xl border border-[--color-surface-300] px-4 py-2 text-xs font-semibold text-[--color-surface-700] transition hover:border-[--color-primary-400] hover:text-[--color-primary-700]"
+                  class="rounded-xl border border-surface-300 px-4 py-2 text-xs font-semibold text-surface-700 transition hover:border-primary-400 hover:text-primary-700"
                   @click="useCurrentMonth"
                 >
                   Este mes
                 </button>
                 <button
                   type="button"
-                  class="rounded-xl border border-[--color-surface-300] px-4 py-2 text-xs font-semibold text-[--color-surface-700] transition hover:border-[--color-primary-400] hover:text-[--color-primary-700]"
+                  class="rounded-xl border border-surface-300 px-4 py-2 text-xs font-semibold text-surface-700 transition hover:border-primary-400 hover:text-primary-700"
                   @click="usePreviousMonth"
                 >
                   Mes anterior
@@ -368,16 +369,11 @@ onMounted(async () => {
               </div>
 
               <div class="max-w-56">
-                <label class="mb-3 block text-xs font-semibold uppercase tracking-[0.14em] text-[--color-surface-500]">Seleccionar mes</label>
-                <input
-                  v-model="salesMonth"
-                  type="month"
-                  class="input-base"
-                >
+                <UiInput v-model="salesMonth" label="Seleccionar mes" size="sm" type="month" />
               </div>
             </div>
 
-            <div v-else-if="salesPreset === 'custom'" class="rounded-2xl border border-[--color-surface-200] bg-[--color-surface-50] p-4 sm:p-5">
+            <div v-else-if="salesPreset === 'custom'" class="rounded-2xl border border-surface-200 bg-surface-50 p-4 sm:p-5">
               <div class="mb-4 flex flex-wrap items-center gap-3">
                 <button
                   v-for="range in customQuickRanges"
@@ -385,8 +381,8 @@ onMounted(async () => {
                   type="button"
                   class="rounded-xl border px-4 py-2 text-xs font-semibold transition"
                   :class="isQuickRangeActive(range.days)
-                    ? 'border-[--color-primary-600] bg-[--color-primary-600] text-white'
-                    : 'border-[--color-surface-300] text-[--color-surface-700] hover:border-[--color-primary-400] hover:text-[--color-primary-700]'"
+                    ? 'border-primary-600 bg-primary-600 text-white'
+                    : 'border-surface-300 text-surface-700 hover:border-primary-400 hover:text-primary-700'"
                   @click="applyQuickCustomRange(range.days)"
                 >
                   {{ range.label }}
@@ -395,30 +391,20 @@ onMounted(async () => {
 
               <div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
                 <div class="min-w-0">
-                  <label class="mb-3 block text-xs font-semibold uppercase tracking-[0.14em] text-[--color-surface-500]">Desde</label>
-                  <input
-                    v-model="salesFrom"
-                    type="date"
-                    class="input-base min-w-0 max-w-full"
-                  >
+                  <UiInput v-model="salesFrom" label="Desde" size="sm" type="date" class="min-w-0 max-w-full" />
                 </div>
                 <div class="min-w-0">
-                  <label class="mb-3 block text-xs font-semibold uppercase tracking-[0.14em] text-[--color-surface-500]">Hasta</label>
-                  <input
-                    v-model="salesTo"
-                    type="date"
-                    class="input-base min-w-0 max-w-full"
-                  >
+                  <UiInput v-model="salesTo" label="Hasta" size="sm" type="date" class="min-w-0 max-w-full" />
                 </div>
               </div>
 
-              <p v-if="customRangeError" class="mt-3 text-sm text-[--color-danger-600]">
+              <p v-if="customRangeError" class="mt-3 text-sm text-danger-600" role="alert" aria-live="polite">
                 {{ customRangeError }}
               </p>
-              <p v-else-if="customRangeDays" class="mt-3 text-sm text-[--color-surface-600]">
+              <p v-else-if="customRangeDays" class="mt-3 text-sm text-surface-600">
                 Rango seleccionado: {{ customRangeDays }} dias
               </p>
-              <p class="mt-2 text-xs text-[--color-surface-500]">
+              <p class="mt-2 text-xs text-surface-500">
                 El rango se consulta solo cuando presionas Aceptar.
               </p>
 
@@ -435,7 +421,7 @@ onMounted(async () => {
             </div>
 
             <div class="flex items-center justify-between gap-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-surface-500]">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-surface-500">
                 {{ sales.period.label }}
               </p>
               <UiBadge :color="weekDeltaTone" dot>
@@ -446,38 +432,38 @@ onMounted(async () => {
 
           <div class="mb-6 flex items-center justify-between gap-4">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-surface-500]">Revenue del periodo</p>
-              <p class="text-2xl font-semibold text-[--color-surface-950]">{{ fmt(sales.trend.totalRevenue) }}</p>
-              <p class="mt-1 text-xs text-[--color-surface-500]">Montos agregados mostrados en la moneda default configurada</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-surface-500">Revenue del periodo</p>
+              <p class="text-2xl font-semibold text-surface-950">{{ fmt(sales.trend.totalRevenue) }}</p>
+              <p class="mt-1 text-xs text-surface-500">Montos agregados mostrados en la moneda default configurada</p>
             </div>
             <UiSpinner v-if="salesLoading" inline size="sm" label="Actualizando..." tone="neutral" />
           </div>
 
-          <div class="rounded-2xl border border-[--color-surface-200] bg-[--color-surface-50] p-4 sm:p-5">
+          <div class="rounded-2xl border border-surface-200 bg-surface-50 p-4 sm:p-5">
             <div class="overflow-x-auto">
               <div class="flex h-44 min-w-max items-end gap-4">
                 <div v-for="point in salesColumns" :key="point.date" class="flex w-10 flex-col items-center gap-3">
-                  <div class="w-full rounded-t-md bg-[--color-primary-500] transition-all" :style="{ height: `${point.height}%` }" />
-                  <div class="text-[11px] font-semibold text-[--color-surface-500]">{{ point.label }}</div>
+                  <div class="w-full rounded-t-md bg-primary-500 transition-all" :style="{ height: `${point.height}%` }" />
+                  <div class="text-[11px] font-semibold text-surface-500">{{ point.label }}</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="min-w-0 rounded-2xl border border-[--color-surface-200] bg-[--color-surface-50] px-4 py-6 sm:px-5 lg:px-6">
+        <div class="min-w-0 rounded-2xl border border-surface-200 bg-surface-50 px-4 py-6 sm:px-5 lg:px-6">
           <div class="space-y-4">
-            <div class="rounded-2xl border border-[--color-surface-200] bg-white px-6 py-5" data-test="sales-card-current">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-surface-500]">Periodo actual</p>
-              <p class="mt-4 text-xl font-semibold text-[--color-surface-950]">{{ fmt(sales.comparison.currentRevenue) }}</p>
+            <div class="rounded-2xl border border-surface-200 bg-surface-0 px-6 py-5" data-test="sales-card-current">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-surface-500">Periodo actual</p>
+              <p class="mt-4 text-xl font-semibold text-surface-950">{{ fmt(sales.comparison.currentRevenue) }}</p>
             </div>
-            <div class="rounded-2xl border border-[--color-surface-200] bg-white px-6 py-5" data-test="sales-card-previous">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-surface-500]">Periodo anterior</p>
-              <p class="mt-4 text-xl font-semibold text-[--color-surface-950]">{{ fmt(sales.comparison.previousRevenue) }}</p>
+            <div class="rounded-2xl border border-surface-200 bg-surface-0 px-6 py-5" data-test="sales-card-previous">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-surface-500">Periodo anterior</p>
+              <p class="mt-4 text-xl font-semibold text-surface-950">{{ fmt(sales.comparison.previousRevenue) }}</p>
             </div>
-            <div class="rounded-2xl border border-[--color-surface-200] bg-white px-6 py-5" data-test="sales-card-orders">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-surface-500]">Ordenes del periodo</p>
-              <p class="mt-4 text-xl font-semibold text-[--color-surface-950]">{{ sales.trend.totalOrders }}</p>
+            <div class="rounded-2xl border border-surface-200 bg-surface-0 px-6 py-5" data-test="sales-card-orders">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-surface-500">Ordenes del periodo</p>
+              <p class="mt-4 text-xl font-semibold text-surface-950">{{ sales.trend.totalOrders }}</p>
             </div>
           </div>
         </div>
@@ -495,46 +481,46 @@ onMounted(async () => {
         </div>
       </UiCard>
 
-      <UiCard title="Variantes críticas">
+      <UiCard title="Productos críticos">
         <div class="min-h-40 flex items-center justify-center">
-          <UiSpinner label="Cargando variantes..." />
+          <UiSpinner label="Cargando productos..." />
         </div>
       </UiCard>
     </div>
 
     <div v-else-if="inventoryAlerts" class="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-6">
       <UiCard :title="`Alertas de inventario (umbral ${inventoryAlerts.threshold})`">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="rounded-2xl border border-[--color-warning-200] bg-[--color-warning-50] p-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-warning-700]">Stock bajo</p>
-            <p class="mt-2 text-3xl font-semibold text-[--color-warning-900]">{{ inventoryAlerts.lowStockCount }}</p>
-            <p class="mt-1 text-sm text-[--color-warning-800]">Variantes activas con pocas unidades disponibles</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
+          <div class="rounded-2xl border border-warning-200 bg-warning-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-warning-700">Stock bajo</p>
+            <p class="mt-2 text-3xl font-semibold text-warning-900">{{ inventoryAlerts.lowStockCount }}</p>
+            <p class="mt-1 text-sm text-warning-800">Productos activos con pocas unidades disponibles</p>
           </div>
 
-          <div class="rounded-2xl border border-[--color-danger-200] bg-[--color-danger-50] p-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[--color-danger-700]">Sin stock</p>
-            <p class="mt-2 text-3xl font-semibold text-[--color-danger-900]">{{ inventoryAlerts.outOfStockCount }}</p>
-            <p class="mt-1 text-sm text-[--color-danger-800]">Variantes activas agotadas y listas para reposición</p>
+          <div class="rounded-2xl border border-danger-200 bg-danger-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-danger-700">Sin stock</p>
+            <p class="mt-2 text-3xl font-semibold text-danger-900">{{ inventoryAlerts.outOfStockCount }}</p>
+            <p class="mt-1 text-sm text-danger-800">Productos activos agotados y listos para reposición</p>
           </div>
         </div>
       </UiCard>
 
-      <UiCard title="Variantes críticas">
+      <UiCard title="Productos críticos">
         <UiEmptyState
           v-if="!inventoryAlerts.lowStockVariants.length"
-          title="No hay variantes con stock crítico"
+          title="No hay productos con stock crítico"
           description="Todo se encuentra por encima del umbral configurado."
         />
-        <div v-else class="space-y-4">
+        <div v-else class="space-y-4 p-4">
           <div
             v-for="variant in inventoryAlerts.lowStockVariants"
             :key="variant.id"
-            class="flex items-start justify-between gap-4 rounded-2xl border border-[--color-surface-200] px-4 py-4"
+            class="flex items-start justify-between gap-4 rounded-2xl border border-surface-200 px-4 py-4"
           >
             <div>
-              <p class="font-medium text-[--color-surface-950]">{{ variant.productName }}</p>
-              <p class="text-sm text-[--color-surface-600]">{{ variant.sizeName }} / {{ variant.colorName }}</p>
-              <p class="mt-1 font-mono text-xs text-[--color-surface-500]">{{ variant.sku }}</p>
+              <p class="font-medium text-surface-950">{{ variant.productName }}</p>
+              <p class="text-sm text-surface-600">{{ variant.descriptor || variant.categoryName || 'Producto general' }}</p>
+              <p class="mt-1 font-mono text-xs text-surface-500">{{ variant.sku }}</p>
             </div>
             <UiBadge :color="variant.stock === 0 ? 'danger' : 'warning'" dot>
               {{ variant.stock }} u.
@@ -565,7 +551,7 @@ onMounted(async () => {
             class="table-tr-hover cursor-pointer"
             @click="$router.push({ name: 'orders-detail', params: { id: o.id } })"
           >
-            <td class="table-td font-mono text-xs text-[--color-surface-500]">
+            <td class="table-td font-mono text-xs text-surface-500">
               #{{ o.id.slice(0, 8) }}
             </td>
             <td class="table-td">{{ o.user.email }}</td>
@@ -582,7 +568,7 @@ onMounted(async () => {
           </tr>
         </UiTable>
 
-        <div v-if="showRecentOrdersPagination" class="border-t border-[--color-surface-200] p-4">
+        <div v-if="showRecentOrdersPagination" class="border-t border-surface-200 p-4">
           <UiPagination
             :page="recentOrdersPage"
             :total-pages="recentOrdersTotalPages"

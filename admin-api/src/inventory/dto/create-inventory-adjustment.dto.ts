@@ -3,9 +3,15 @@ import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { InventoryMovementType } from '../enums/inventory-movement-type.enum';
 
 export class CreateInventoryAdjustmentDto {
-  @ApiProperty({ example: 'f77222c7-2648-4ef4-8488-350f53e6805b' })
+  @ApiPropertyOptional({ example: 'f77222c7-2648-4ef4-8488-350f53e6805b' })
   @IsString()
-  variantId: string;
+  @IsOptional()
+  productId?: string;
+
+  @ApiPropertyOptional({ example: 'f77222c7-2648-4ef4-8488-350f53e6805b' })
+  @IsOptional()
+  @IsString()
+  variantId?: string;
 
   @ApiProperty({ example: 10 })
   @IsInt()

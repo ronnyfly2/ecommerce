@@ -9,6 +9,20 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+export type CategoryAttributeDefinitionType = 'text' | 'number' | 'boolean' | 'select';
+
+export type CategoryAttributeDefinition = {
+  key: string;
+  label: string;
+  type: CategoryAttributeDefinitionType;
+  unit: string | null;
+  required: boolean;
+  options: string[];
+  helpText: string | null;
+  displayOrder: number;
+  isActive: boolean;
+};
+
 @Entity('categories')
 export class Category {
   @PrimaryGeneratedColumn('uuid')
@@ -31,6 +45,18 @@ export class Category {
 
   @Column({ name: 'display_order', type: 'int', default: 0 })
   displayOrder: number;
+
+  @Column({ name: 'supports_size_color_variants', default: true })
+  supportsSizeColorVariants: boolean;
+
+  @Column({ name: 'supports_dimensions', default: false })
+  supportsDimensions: boolean;
+
+  @Column({ name: 'supports_weight', default: false })
+  supportsWeight: boolean;
+
+  @Column({ name: 'attribute_definitions', type: 'jsonb', default: () => "'[]'" })
+  attributeDefinitions: CategoryAttributeDefinition[];
 
   @ManyToOne(() => Category, (category) => category.children, {
     nullable: true,

@@ -674,7 +674,13 @@ export interface ChatMessage {
   id: string
   senderId: string | null
   recipientId: string | null
+  groupId: string | null
   content: string
+  messageType: 'TEXT' | 'IMAGE' | 'DOCUMENT'
+  attachmentUrl: string | null
+  attachmentName: string | null
+  attachmentMime: string | null
+  attachmentSize: number | null
   isRead: boolean
   readAt: string | null
   createdAt: string
@@ -697,5 +703,63 @@ export interface ConversationSummary {
 export interface ChatMessagesData {
   items: ChatMessage[]
   meta: ApiPaginationMeta
+}
+
+export interface GroupConversationSummary {
+  groupId: string
+  name: string
+  lastMessageContent: string
+  lastMessageAt: string
+  lastMessageSenderId: string | null
+  unreadCount: number
+  memberCount: number
+}
+
+export interface CreateChatGroupDto {
+  name: string
+  memberIds: string[]
+}
+
+// ----------------------------------------------------------
+// Reviews
+// ----------------------------------------------------------
+export interface ReviewUser {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+}
+
+export interface ProductReview {
+  id: string
+  rating: number
+  comment: string | null
+  isApproved: boolean
+  createdAt: string
+  updatedAt: string
+  user: ReviewUser
+}
+
+export interface ReviewStats {
+  total: number
+  average: number | null
+  distribution: Record<string, number>
+}
+
+export interface CreateReviewDto {
+  rating: number
+  comment?: string
+}
+
+export interface UpdateReviewDto {
+  rating?: number
+  comment?: string
+  isApproved?: boolean
+}
+
+export interface QueryReviewsDto {
+  page?: number
+  limit?: number
+  isApproved?: boolean
 }
 

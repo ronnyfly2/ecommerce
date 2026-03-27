@@ -17,11 +17,11 @@ const props = withDefaults(defineProps<{
 
 const toneClass = computed(() => {
   if (props.color) return props.color
-  return props.tone === 'neutral' ? 'text-[--color-surface-500]' : 'text-[--color-primary-600]'
+  return props.tone === 'neutral' ? 'text-surface-500' : 'text-primary-600'
 })
 
 const labelClass = computed(() => {
-  return props.tone === 'neutral' ? 'text-[--color-surface-600]' : 'text-[--color-surface-700]'
+  return props.tone === 'neutral' ? 'text-surface-600' : 'text-surface-700'
 })
 
 const iconClass = computed(() => {

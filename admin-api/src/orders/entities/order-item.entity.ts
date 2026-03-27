@@ -6,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Product } from '../../products/entities/product.entity';
 import { Order } from './order.entity';
 import { ProductVariant } from '../../products/entities/product-variant.entity';
 
@@ -18,9 +19,22 @@ export class OrderItem {
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
-  @ManyToOne(() => ProductVariant, { nullable: false, onDelete: 'RESTRICT' })
+  @ManyToOne(() => Product, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'product_id' })
+  product: Product | null;
+
+  @ManyToOne(() => ProductVariant, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'variant_id' })
-  variant: ProductVariant;
+  variant: ProductVariant | null;
+
+  @Column({ name: 'snapshot_product_name', type: 'varchar', nullable: true })
+  snapshotProductName: string | null;
+
+  @Column({ name: 'snapshot_sku', type: 'varchar', nullable: true })
+  snapshotSku: string | null;
+
+  @Column({ name: 'snapshot_descriptor', type: 'varchar', nullable: true })
+  snapshotDescriptor: string | null;
 
   @Column({ type: 'int' })
   quantity: number;

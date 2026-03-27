@@ -9,8 +9,8 @@ describe('Orders List - Role-Based Access Control', () => {
   }
 
   const customerCredentials = {
-    email: Cypress.env('CUSTOMER_EMAIL') || 'customer@local.dev',
-    password: Cypress.env('CUSTOMER_PASSWORD') || 'Customer123!',
+    email: Cypress.env('CUSTOMER_EMAIL') || 'customer1@local.dev',
+    password: Cypress.env('CUSTOMER_PASSWORD') || 'Customer2026!',
   }
 
   describe('Admin user', () => {

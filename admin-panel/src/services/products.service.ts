@@ -25,7 +25,7 @@ export const productsService = {
   },
 
   async getRecommendations(id: string) {
-    const res = await http.get<ApiResponse<{ product: Pick<Product, 'id' | 'name' | 'sku'>; relatedProducts: Product[]; suggestedProducts: Product[] }>>(
+    const res = await http.get<ApiResponse<{ product: Pick<Product, 'id' | 'name' | 'sku'>; relatedProducts: Product[]; suggestedProducts: Product[]; variantProducts: Product[] }>>(
       `/products/${id}/recommendations`,
     )
     return res.data.data

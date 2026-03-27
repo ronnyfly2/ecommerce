@@ -17,26 +17,30 @@ const icons: Record<ToastType, string> = {
 }
 
 const colors: Record<ToastType, string> = {
-  success: 'text-[--color-success-600] bg-[--color-success-50] border-[--color-success-200]',
-  error:   'text-[--color-danger-600]  bg-[--color-danger-50]  border-[--color-danger-200]',
-  warning: 'text-[--color-warning-600] bg-[--color-warning-50] border-[--color-warning-200]',
-  info:    'text-[--color-info-600]    bg-[--color-info-50]    border-[--color-info-200]',
+  success: 'text-success-700 bg-success-50 border-success-200',
+  error:   'text-danger-700  bg-danger-50  border-danger-200',
+  warning: 'text-warning-800 bg-warning-50 border-warning-200',
+  info:    'text-info-700    bg-info-50    border-info-200',
 }
 
 const iconColors: Record<ToastType, string> = {
-  success: 'text-[--color-success-500]',
-  error:   'text-[--color-danger-500]',
-  warning: 'text-[--color-warning-500]',
-  info:    'text-[--color-info-500]',
+  success: 'text-success-700',
+  error:   'text-danger-700',
+  warning: 'text-warning-800',
+  info:    'text-info-700',
 }
 </script>
 
 <template>
   <div
+    :role="type === 'error' || type === 'warning' ? 'alert' : 'status'"
+    :aria-live="type === 'error' || type === 'warning' ? 'assertive' : 'polite'"
+    aria-atomic="true"
     :class="['flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-sm w-full', colors[type]]"
   >
     <svg
       :class="['w-5 h-5 shrink-0 mt-0.5', iconColors[type]]"
+      aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -48,7 +52,7 @@ const iconColors: Record<ToastType, string> = {
       <p class="text-sm font-medium">{{ title }}</p>
       <p v-if="message" class="text-xs mt-0.5 opacity-80">{{ message }}</p>
     </div>
-    <button @click="$emit('close')" class="shrink-0 opacity-50 hover:opacity-100 transition-opacity">
+    <button @click="$emit('close')" class="shrink-0 opacity-50 hover:opacity-100 transition-opacity" aria-label="Cerrar notificación">
       <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
       </svg>

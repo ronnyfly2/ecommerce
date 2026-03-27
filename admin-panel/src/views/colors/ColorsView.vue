@@ -4,18 +4,35 @@ import { colorsService } from '@/services/catalog.service'
 import type { Color } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiButton from '@/components/ui/UiButton.vue'
+import UiColorInput from '@/components/ui/UiColorInput.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiTable from '@/components/ui/UiTable.vue'
+import CatalogAuditHead from '@/components/catalog/CatalogAuditHead.vue'
+import CatalogAuditCells from '@/components/catalog/CatalogAuditCells.vue'
+import CatalogActionsHead from '@/components/catalog/CatalogActionsHead.vue'
+import CatalogActionsCell from '@/components/catalog/CatalogActionsCell.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormModalLayout from '@/components/forms/FormModalLayout.vue'
+import FormToggleField from '@/components/forms/FormToggleField.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
+import UiBadge from '@/components/ui/UiBadge.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
 const colors = ref<Color[] | null>(null)
 const tableLoading = computed(() => colors.value === null)
 
-const formModal = reactive({ show: false, loading: false, isEdit: false, id: '', name: '', hexCode: '#000000' })
+const formModal = reactive({
+  show: false,
+  loading: false,
+  isEdit: false,
+  id: '',
+  name: '',
+  hexCode: '#000000',
+  isActive: true,
+})
 const confirm = reactive({ show: false, id: '', name: '', loading: false })
 
 async function load() {
@@ -33,6 +50,7 @@ function openCreate() {
   formModal.id = ''
   formModal.name = ''
   formModal.hexCode = '#000000'
+  formModal.isActive = true
   formModal.show = true
 }
 
@@ -41,13 +59,18 @@ function openEdit(color: Color) {
   formModal.id = color.id
   formModal.name = color.name
   formModal.hexCode = color.hexCode
+  formModal.isActive = color.isActive
   formModal.show = true
 }
 
 async function saveColor() {
   formModal.loading = true
   try {
-    const payload = { name: formModal.name, hexCode: formModal.hexCode }
+    const payload = {
+      name: formModal.name,
+      hexCode: formModal.hexCode,
+      isActive: formModal.isActive,
+    }
 
     if (formModal.isEdit) {
       await colorsService.update(formModal.id, payload)
@@ -91,36 +114,39 @@ onMounted(load)
 
 <template>
   <div class="space-y-4">
-    <div class="flex justify-end">
-      <UiButton @click="openCreate">Nuevo color</UiButton>
-    </div>
+    <ListViewToolbar>
+      <template #actions>
+        <UiButton @click="openCreate">Nuevo color</UiButton>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="colors" :loading="tableLoading" loading-color="primary" loading-text="Cargando colores..." no-min-width empty-message="No hay colores">
+      <UiTable :data="colors" :loading="tableLoading" loading-color="primary" loading-text="Cargando colores..." empty-message="No hay colores">
         <template #head>
           <tr>
-            <th class="table-th">Color</th>
+            <th class="table-th">Nombre</th>
             <th class="table-th">HEX</th>
-            <th class="table-th">Creado</th>
-            <th class="table-th table-actions-th" />
+            <th class="table-th text-center">Estado</th>
+            <CatalogAuditHead />
+            <CatalogActionsHead />
           </tr>
         </template>
 
         <tr v-for="c in colors ?? []" :key="c.id" class="table-tr-hover">
           <td class="table-td">
             <div class="flex items-center gap-2">
-              <span class="w-4 h-4 rounded-full border border-[--color-surface-300]" :style="{ backgroundColor: c.hexCode }" />
+              <span class="w-4 h-4 rounded-full border border-surface-300" :style="{ backgroundColor: c.hexCode }" />
               <span class="font-medium">{{ c.name }}</span>
             </div>
           </td>
           <td class="table-td font-mono text-xs">{{ c.hexCode }}</td>
-          <td class="table-td text-muted text-xs">{{ new Date(c.createdAt).toLocaleDateString('es-AR') }}</td>
-          <td class="table-td table-actions-td text-right">
-            <div class="flex items-center gap-2 justify-end">
-              <UiButton size="sm" variant="ghost" @click="openEdit(c)">Editar</UiButton>
-              <UiButton size="sm" variant="danger" @click="askDelete(c)">Eliminar</UiButton>
-            </div>
+          <td class="table-td text-center">
+            <UiBadge :color="c.isActive ? 'success' : 'neutral'" dot>
+              {{ c.isActive ? 'Activo' : 'Inactivo' }}
+            </UiBadge>
           </td>
+          <CatalogAuditCells :created-at="c.createdAt" :updated-at="c.updatedAt" />
+          <CatalogActionsCell @edit="openEdit(c)" @delete="askDelete(c)" />
         </tr>
 
         <template #empty-actions>
@@ -130,13 +156,16 @@ onMounted(load)
     </UiCard>
 
     <UiModal :show="formModal.show" :title="formModal.isEdit ? 'Editar color' : 'Nuevo color'" @close="formModal.show = false">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <UiInput v-model="formModal.name" label="Nombre" required placeholder="Rojo" />
+      <FormModalLayout>
+        <UiInput v-model="formModal.name" label="Nombre" size="lg" required placeholder="Rojo" />
         <div class="flex items-end gap-3">
-          <UiInput v-model="formModal.hexCode" label="HEX" required placeholder="#FF0000" />
-          <input v-model="formModal.hexCode" type="color" class="h-10 w-12 rounded border border-[--color-surface-300] bg-white" />
+          <UiInput v-model="formModal.hexCode" label="HEX" size="lg" required placeholder="#FF0000" />
+          <UiColorInput v-model="formModal.hexCode" label="Vista" size="lg" />
         </div>
-      </div>
+        <div class="md:col-span-2">
+          <FormToggleField v-model="formModal.isActive" label="Activo" />
+        </div>
+      </FormModalLayout>
 
       <template #footer>
         <FormModalActions :loading="formModal.loading" @cancel="formModal.show = false" @save="saveColor" />

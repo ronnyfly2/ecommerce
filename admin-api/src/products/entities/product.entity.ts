@@ -17,6 +17,14 @@ import { ProductImage } from './product-image.entity';
 import { ProductRecommendation } from './product-recommendation.entity';
 import { ProductVariant } from './product-variant.entity';
 
+export type ProductAttributeValue = {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'boolean' | 'select';
+  unit: string | null;
+  value: string | number | boolean;
+};
+
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn('uuid')
@@ -39,6 +47,30 @@ export class Product {
 
   @Column({ name: 'currency_code', type: 'varchar', length: 3, default: 'USD' })
   currencyCode: string;
+
+  @Column({ type: 'int', default: 0 })
+  stock: number;
+
+  @Column({ name: 'weight_value', type: 'decimal', precision: 10, scale: 3, nullable: true })
+  weightValue: string | null;
+
+  @Column({ name: 'weight_unit', type: 'varchar', length: 10, nullable: true })
+  weightUnit: string | null;
+
+  @Column({ name: 'length_value', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  lengthValue: string | null;
+
+  @Column({ name: 'width_value', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  widthValue: string | null;
+
+  @Column({ name: 'height_value', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  heightValue: string | null;
+
+  @Column({ name: 'dimension_unit', type: 'varchar', length: 10, nullable: true })
+  dimensionUnit: string | null;
+
+  @Column({ name: 'attribute_values', type: 'jsonb', default: () => "'[]'" })
+  attributeValues: ProductAttributeValue[];
 
   @ManyToOne(() => Category, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'category_id' })

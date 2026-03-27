@@ -54,7 +54,7 @@ async function submit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[--color-surface-100] flex items-center justify-center p-4">
+  <div class="min-h-screen bg-surface-100 flex items-center justify-center p-4">
     <UiToastContainer />
 
     <div class="w-full max-w-md card p-6 space-y-4">
@@ -65,7 +65,7 @@ async function submit() {
         </p>
       </div>
 
-      <div v-if="tokenMissing" class="text-sm text-[--color-danger-600] bg-[--color-danger-50] rounded-lg px-3 py-2">
+      <div v-if="tokenMissing" class="text-sm text-danger-700 bg-danger-50 rounded-lg px-3 py-2" role="alert" aria-live="assertive">
         El token es inválido o no fue enviado. Solicita un nuevo enlace de recuperación.
       </div>
 
@@ -76,6 +76,7 @@ async function submit() {
           type="password"
           autocomplete="new-password"
           label="Nueva contraseña"
+          size="lg"
           placeholder="Mínimo 8 caracteres, mayúscula, número y símbolo"
           required
           :disabled="tokenMissing"
@@ -87,17 +88,18 @@ async function submit() {
           type="password"
           autocomplete="new-password"
           label="Confirmar contraseña"
+          size="lg"
           placeholder="Repite tu contraseña"
           required
           :disabled="tokenMissing"
           :error="passwordMismatch ? 'Las contraseñas no coinciden' : undefined"
         />
 
-        <div v-if="successMessage" class="text-sm text-[--color-success-700] bg-[--color-success-50] rounded-lg px-3 py-2">
+        <div v-if="successMessage" class="text-sm text-success-700 bg-success-50 rounded-lg px-3 py-2" role="status" aria-live="polite">
           {{ successMessage }}
         </div>
 
-        <div v-if="error" class="text-sm text-[--color-danger-600] bg-[--color-danger-50] rounded-lg px-3 py-2">
+        <div v-if="error" class="text-sm text-danger-700 bg-danger-50 rounded-lg px-3 py-2" role="alert" aria-live="assertive">
           {{ error }}
         </div>
 
@@ -112,10 +114,10 @@ async function submit() {
         </UiButton>
       </form>
 
-      <div class="flex justify-between items-center pt-2 border-t border-[--color-surface-200]">
+      <div class="flex justify-between items-center pt-2 border-t border-surface-200">
         <button
           type="button"
-          class="text-sm text-[--color-primary-700] hover:text-[--color-primary-800]"
+          class="text-sm text-primary-700 hover:text-primary-800"
           @click="router.push({ name: 'forgot-password' })"
         >
           Solicitar nuevo enlace
@@ -123,7 +125,7 @@ async function submit() {
 
         <button
           type="button"
-          class="text-sm text-[--color-surface-600] hover:text-[--color-surface-900]"
+          class="text-sm text-surface-600 hover:text-surface-900"
           @click="router.push({ name: 'login' })"
         >
           Volver al login

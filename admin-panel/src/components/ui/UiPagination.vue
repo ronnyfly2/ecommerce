@@ -26,21 +26,25 @@ const pages = computed(() => {
     <p v-if="total !== undefined" class="text-muted text-sm">
       {{ total }} resultado{{ total !== 1 ? 's' : '' }}
     </p>
-    <div class="flex items-center gap-1 ml-auto">
+    <nav class="flex items-center gap-1 ml-auto" aria-label="Paginación">
       <button
-        class="btn-base btn-ghost btn-sm"
+        class="btn-base btn-ghost btn-sm disabled:!opacity-100 disabled:!text-surface-700"
         :disabled="page <= 1"
+        aria-label="Página anterior"
         @click="emit('change', page - 1)"
       >
-        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
         </svg>
+        <span class="sr-only">Página anterior</span>
       </button>
 
       <template v-for="p in pages" :key="p">
         <span v-if="p === '...'" class="px-2 text-muted">…</span>
         <button
           v-else
+          :aria-label="`Ir a la página ${p}`"
+          :aria-current="p === page ? 'page' : undefined"
           :class="[
             'btn-base btn-sm min-w-[32px]',
             p === page ? 'btn-primary' : 'btn-ghost',
@@ -52,14 +56,16 @@ const pages = computed(() => {
       </template>
 
       <button
-        class="btn-base btn-ghost btn-sm"
+        class="btn-base btn-ghost btn-sm disabled:!opacity-100 disabled:!text-surface-700"
         :disabled="page >= totalPages"
+        aria-label="Página siguiente"
         @click="emit('change', page + 1)"
       >
-        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
         </svg>
+        <span class="sr-only">Página siguiente</span>
       </button>
-    </div>
+    </nav>
   </div>
 </template>

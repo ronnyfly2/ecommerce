@@ -17,7 +17,9 @@ import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import type { CreateUserDto, UpdateUserDto } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -219,19 +221,21 @@ async function removeUser() {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col xl:flex-row gap-3 xl:items-center xl:justify-between">
-      <div class="flex flex-wrap gap-3">
-        <UiInput v-model="filters.search" placeholder="Buscar por email o nombre…" class="min-w-60" />
-        <UiSelect v-model="filters.role" :options="roleOptions" class="min-w-45" />
-        <UiSelect v-model="filters.isActive" :options="activeOptions" class="min-w-40" />
-      </div>
-      <UiButton v-if="canManageUsers" @click="openCreate">
-        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-        </svg>
-        Nuevo usuario
-      </UiButton>
-    </div>
+    <ListViewToolbar>
+      <template #filters>
+        <UiInput v-model="filters.search" label="Buscar usuarios" size="sm" placeholder="Buscar por email o nombre…" class="min-w-60" />
+        <UiSelect v-model="filters.role" label="Filtrar por rol" size="sm" :options="roleOptions" class="min-w-45" />
+        <UiSelect v-model="filters.isActive" label="Filtrar por estado" size="sm" :options="activeOptions" class="min-w-40" />
+      </template>
+      <template #actions>
+        <UiButton v-if="canManageUsers" @click="openCreate">
+          <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Nuevo usuario
+        </UiButton>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
       <UiTable :data="users" :loading="tableLoading" loading-color="primary" loading-text="Cargando usuarios..." empty-message="No hay usuarios">
@@ -279,7 +283,7 @@ async function removeUser() {
         </template>
       </UiTable>
 
-      <div class="p-4 border-t border-[--color-surface-200]">
+      <div class="p-4 border-t border-surface-200">
         <UiPagination
           :page="pg.page.value"
           :total-pages="pg.totalPages.value"
@@ -296,26 +300,28 @@ async function removeUser() {
       size="md"
       @close="formModal.show = false"
     >
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <UiInput v-model="formModal.email" label="Email" type="email" required class="md:col-span-2" />
+      <FormModalLayout>
+        <UiInput v-model="formModal.email" label="Email" size="lg" type="email" required class="md:col-span-2" />
         <UiInput
           v-model="formModal.password"
           :label="formModal.isEdit ? 'Contraseña (opcional)' : 'Contraseña'"
           type="password"
+          size="lg"
           :required="!formModal.isEdit"
           class="md:col-span-2"
         />
-        <UiInput v-model="formModal.firstName" label="Nombre" />
-        <UiInput v-model="formModal.lastName" label="Apellido" />
+        <UiInput v-model="formModal.firstName" label="Nombre" size="lg" />
+        <UiInput v-model="formModal.lastName" label="Apellido" size="lg" />
         <UiSelect
           v-model="formModal.role"
           label="Rol"
+          size="lg"
           :options="roleOptions.filter(opt => opt.value !== '')"
         />
         <div class="flex items-center pt-7">
           <FormToggleField v-model="formModal.isActive" label="Activo" />
         </div>
-      </div>
+      </FormModalLayout>
 
       <template #footer>
         <FormModalActions :loading="formModal.loading" @cancel="formModal.show = false" @save="saveUser" />

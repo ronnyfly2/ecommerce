@@ -16,6 +16,8 @@ import UiModal from '@/components/ui/UiModal.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import UiTable from '@/components/ui/UiTable.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormModalLayout from '@/components/forms/FormModalLayout.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const toast = useToast()
@@ -34,18 +36,21 @@ const canManageInventory = computed(() => auth.can('inventory.manage'))
 const modal = reactive({
   show: false,
   loading: false,
+  productId: '',
   variantId: '',
   quantityChange: 0,
   type: InventoryMovementType.ADJUSTMENT as InventoryMovementType,
   reason: '',
 })
 
-const filters = reactive({ variantId: '' })
+const filters = reactive({ productId: '', variantId: '' })
+const productIdFilter = toRef(filters, 'productId')
 const variantIdFilter = toRef(filters, 'variantId')
 
 function syncQuery() {
   const query: Record<string, string> = {}
   if (pg.page.value > 1) query.page = String(pg.page.value)
+  if (filters.productId) query.productId = filters.productId
   if (filters.variantId) query.variantId = filters.variantId
   router.replace({ query })
 }
@@ -58,9 +63,9 @@ const typeOptions = [
 ]
 
 function movementColor(type: InventoryMovementType) {
-  if (type === InventoryMovementType.PURCHASE || type === InventoryMovementType.RETURN) return 'text-[--color-success-600]'
-  if (type === InventoryMovementType.SALE) return 'text-[--color-danger-600]'
-  return 'text-[--color-info-600]'
+  if (type === InventoryMovementType.PURCHASE || type === InventoryMovementType.RETURN) return 'text-success-600'
+  if (type === InventoryMovementType.SALE) return 'text-danger-600'
+  return 'text-info-600'
 }
 
 async function loadProducts() {
@@ -68,9 +73,20 @@ async function loadProducts() {
   products.value = normalizeApiList(data).items
 }
 
-function variantOptions() {
-  const result: { value: string; label: string }[] = [{ value: '', label: 'Todas las variantes' }]
+function productOptions() {
+  return [
+    { value: '', label: 'Todos los productos' },
+    ...products.value.map((product) => ({ value: product.id, label: `${product.name} · ${product.sku}` })),
+  ]
+}
+
+function variantOptions(productId?: string) {
+  const result: { value: string; label: string }[] = [{ value: '', label: 'Todas las versiones' }]
   for (const product of products.value) {
+    if (productId && product.id !== productId) {
+      continue
+    }
+
     for (const variant of product.variants ?? []) {
       result.push({
         value: variant.id,
@@ -87,6 +103,7 @@ async function loadMovements() {
     const data = await inventoryService.movements({
       page: pg.page.value,
       limit: pg.limit.value,
+      productId: filters.productId || undefined,
       variantId: filters.variantId || undefined,
     })
     const result = normalizeApiList(data)
@@ -98,13 +115,25 @@ async function loadMovements() {
   }
 }
 
-watch([pg.page, variantIdFilter], async () => {
+watch([pg.page, productIdFilter, variantIdFilter], async () => {
   if (!initialized.value) return
   syncQuery()
   await loadMovements()
 })
 
+watch(productIdFilter, (nextProductId) => {
+  if (!nextProductId) {
+    return
+  }
+
+  const options = variantOptions(nextProductId)
+  if (!options.some((option) => option.value === filters.variantId)) {
+    filters.variantId = ''
+  }
+})
+
 function openAdjustment() {
+  modal.productId = ''
   modal.variantId = ''
   modal.quantityChange = 0
   modal.type = InventoryMovementType.ADJUSTMENT
@@ -116,7 +145,8 @@ async function saveAdjustment() {
   modal.loading = true
   try {
     await inventoryService.adjust({
-      variantId: modal.variantId,
+      productId: modal.productId || undefined,
+      variantId: modal.variantId || undefined,
       quantityChange: Number(modal.quantityChange),
       type: modal.type,
       reason: modal.reason || undefined,
@@ -143,6 +173,7 @@ onMounted(async () => {
     await loadProducts()
     const page = Number(route.query.page ?? 1)
     pg.page.value = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1
+    filters.productId = typeof route.query.productId === 'string' ? route.query.productId : ''
     filters.variantId = typeof route.query.variantId === 'string' ? route.query.variantId : ''
     initialized.value = true
     await loadMovements()
@@ -154,21 +185,36 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <UiSelect
-          v-model="filters.variantId"
-          :options="variantOptions()"
-          class="w-full sm:min-w-115"
-        />
+    <ListViewToolbar>
+      <template #filters>
+        <div class="grid w-full gap-3 sm:grid-cols-2">
+          <UiSelect
+            v-model="filters.productId"
+            searchable
+            size="sm"
+            search-placeholder="Buscar producto..."
+            :options="productOptions()"
+            class="w-full"
+          />
+          <UiSelect
+            v-model="filters.variantId"
+            searchable
+            size="sm"
+            search-placeholder="Buscar versión..."
+            :options="variantOptions(filters.productId)"
+            class="w-full"
+          />
+        </div>
+      </template>
+      <template #actions>
         <UiButton v-if="canManageInventory" @click="openAdjustment">
           <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           Nuevo movimiento
         </UiButton>
-      </div>
-    </div>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
       <UiTable :data="movements" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando movimientos..." empty-message="Sin movimientos de inventario">
@@ -186,8 +232,10 @@ onMounted(async () => {
         <tr v-for="m in movements ?? []" :key="m.id" class="table-tr-hover">
           <td class="table-td text-xs text-muted">{{ new Date(m.createdAt).toLocaleString('es-AR') }}</td>
           <td class="table-td">
-            <div class="font-medium text-[--color-surface-900]">{{ m.variant.product?.name ?? 'Producto' }}</div>
-            <div class="text-xs text-muted">{{ m.variant.sku }} · {{ m.variant.size.name }}/{{ m.variant.color.name }}</div>
+            <div class="font-medium text-surface-900">{{ m.product?.name ?? m.variant?.product?.name ?? 'Producto' }}</div>
+            <div class="text-xs text-muted">
+              {{ m.variant ? `${m.variant.sku} · ${m.variant.size.name}/${m.variant.color.name}` : `${m.product?.sku ?? 'SIN-SKU'} · movimiento directo` }}
+            </div>
           </td>
           <td class="table-td">{{ m.movementType }}</td>
           <td :class="['table-td text-right font-semibold', movementColor(m.movementType)]">
@@ -202,7 +250,7 @@ onMounted(async () => {
         </template>
       </UiTable>
 
-      <div class="p-4 border-t border-[--color-surface-200]">
+      <div class="p-4 border-t border-surface-200">
         <UiPagination
           :page="pg.page.value"
           :total-pages="pg.totalPages.value"
@@ -213,25 +261,38 @@ onMounted(async () => {
     </UiCard>
 
     <UiModal v-if="canManageInventory" :show="modal.show" title="Nuevo movimiento" @close="modal.show = false">
-      <div class="grid grid-cols-1 gap-4">
+      <FormModalLayout :columns="1">
+        <UiSelect
+          v-model="modal.productId"
+          label="Producto"
+          searchable
+          size="lg"
+          search-placeholder="Buscar producto..."
+          :options="productOptions().filter(o => o.value !== '')"
+        />
         <UiSelect
           v-model="modal.variantId"
-          label="Variante"
-          :options="variantOptions().filter(o => o.value !== '')"
+          label="Versión vinculada"
+          searchable
+          size="lg"
+          search-placeholder="Buscar versión..."
+          :options="variantOptions(modal.productId || undefined).filter(o => o.value !== '')"
         />
         <UiSelect
           v-model="modal.type"
           label="Tipo de movimiento"
+          size="lg"
           :options="typeOptions"
         />
         <UiInput
           v-model="modal.quantityChange"
           type="number"
           label="Cantidad (+/-)"
+          size="lg"
           hint="Usa negativo para salida y positivo para entrada"
         />
-        <UiInput v-model="modal.reason" label="Motivo" placeholder="Ajuste por conteo físico" />
-      </div>
+        <UiInput v-model="modal.reason" label="Motivo" size="lg" placeholder="Ajuste por conteo físico" />
+      </FormModalLayout>
 
       <template #footer>
         <FormModalActions :loading="modal.loading" @cancel="modal.show = false" @save="saveAdjustment" />

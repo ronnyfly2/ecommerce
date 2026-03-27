@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +13,7 @@ import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { ShippingAddress } from './entities/shipping-address.entity';
 import { OrderStatus } from './enums/order-status.enum';
+import { Product } from '../products/entities/product.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { CouponsService } from '../coupons/coupons.service';
 import { InventoryService } from '../inventory/inventory.service';
@@ -26,6 +28,8 @@ import { CurrenciesService } from '../currencies/currencies.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectRepository(Order)
     private readonly ordersRepository: Repository<Order>,
@@ -33,6 +37,8 @@ export class OrdersService {
     private readonly itemsRepository: Repository<OrderItem>,
     @InjectRepository(ShippingAddress)
     private readonly addressesRepository: Repository<ShippingAddress>,
+    @InjectRepository(Product)
+    private readonly productsRepository: Repository<Product>,
     @InjectRepository(ProductVariant)
     private readonly variantsRepository: Repository<ProductVariant>,
     @InjectRepository(Coupon)
@@ -63,24 +69,65 @@ export class OrdersService {
     const orderItems: OrderItem[] = [];
 
     for (const item of dto.items) {
-      const variant = await this.variantsRepository.findOne({
-        where: { id: item.variantId },
-        relations: { product: true },
-      });
-
-      if (!variant) {
-        throw new NotFoundException(`Variant ${item.variantId} not found`);
+      if (!item.productId && !item.variantId) {
+        throw new BadRequestException('Each order item must include a productId or variantId');
       }
 
-      if (variant.stock < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for variant ${variant.sku}. Available: ${variant.stock}, requested: ${item.quantity}`,
-        );
+      let product: Product | null = null;
+      let variant: ProductVariant | null = null;
+      let baseUnitPrice = 0;
+      let snapshotSku = '';
+      let snapshotDescriptor: string | null = null;
+
+      if (item.productId) {
+        product = await this.productsRepository.findOne({ where: { id: item.productId } });
+
+        if (!product) {
+          throw new NotFoundException(`Product ${item.productId} not found`);
+        }
+
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for product ${product.sku}. Available: ${product.stock}, requested: ${item.quantity}`,
+          );
+        }
+
+        baseUnitPrice = Number(product.basePrice);
+        snapshotSku = product.sku;
+      } else if (item.variantId) {
+        variant = await this.variantsRepository.findOne({
+          where: { id: item.variantId },
+          relations: { product: true, size: true, color: true },
+        });
+
+        if (!variant) {
+          throw new NotFoundException(`Variant ${item.variantId} not found`);
+        }
+
+        if (variant.stock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for variant ${variant.sku}. Available: ${variant.stock}, requested: ${item.quantity}`,
+          );
+        }
+
+        product = variant.product;
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient aggregated stock for product ${product.sku}. Available: ${product.stock}, requested: ${item.quantity}`,
+          );
+        }
+
+        baseUnitPrice = Number(variant.product.basePrice) + Number(variant.additionalPrice);
+        snapshotSku = variant.sku;
+        snapshotDescriptor = `${variant.size.name} / ${variant.color.name}`;
       }
 
-      const baseUnitPrice = Number(variant.product.basePrice) + Number(variant.additionalPrice);
+      if (!product) {
+        throw new BadRequestException('Order item product could not be resolved');
+      }
+
       const productCurrency = await this.currenciesService.ensureActive(
-        this.normalizeCurrencyCode(variant.product.currencyCode || defaultCurrencyCode),
+        this.normalizeCurrencyCode(product.currencyCode || defaultCurrencyCode),
       );
       const unitPrice = await this.convertIfNeeded(
         baseUnitPrice,
@@ -92,7 +139,11 @@ export class OrdersService {
       subtotal += itemSubtotal;
 
       const orderItem = this.itemsRepository.create({
+        product,
         variant,
+        snapshotProductName: product.name,
+        snapshotSku,
+        snapshotDescriptor,
         quantity: item.quantity,
         unitPrice: unitPrice.toFixed(2),
         subtotal: itemSubtotal.toFixed(2),
@@ -159,7 +210,14 @@ export class OrdersService {
 
     const persistedOrder = await this.findOne(savedOrder.id);
     await this.notificationsService.sendOrderConfirmation(persistedOrder);
-    await this.notificationsService.notifyOrderCreated(persistedOrder);
+    try {
+      await this.notificationsService.notifyOrderCreated(persistedOrder);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown notification error';
+      this.logger.warn(
+        `Order ${persistedOrder.id} was created but the admin notification failed: ${message}`,
+      );
+    }
 
     return persistedOrder;
   }
@@ -185,7 +243,7 @@ export class OrdersService {
 
     const [items, total] = await this.ordersRepository.findAndCount({
       where,
-      relations: { user: true, coupon: true, items: { variant: { product: true, size: true, color: true } }, shippingAddresses: true },
+      relations: { user: true, coupon: true, items: { product: true, variant: { product: true, size: true, color: true } }, shippingAddresses: true },
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -208,7 +266,7 @@ export class OrdersService {
       relations: {
         user: true,
         coupon: true,
-        items: { variant: { product: true, size: true, color: true } },
+        items: { product: true, variant: { product: true, size: true, color: true } },
         shippingAddresses: true,
       },
     });
@@ -244,11 +302,18 @@ export class OrdersService {
 
     order.status = dto.status;
     const updatedOrder = await this.ordersRepository.save(order);
-    await this.notificationsService.notifyOrderStatusChanged(
-      updatedOrder,
-      previousStatus,
-      actorUserId,
-    );
+    try {
+      await this.notificationsService.notifyOrderStatusChanged(
+        updatedOrder,
+        previousStatus,
+        actorUserId,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown notification error';
+      this.logger.warn(
+        `Order ${updatedOrder.id} changed status to ${updatedOrder.status} but the admin notification failed: ${message}`,
+      );
+    }
 
     return updatedOrder;
   }
@@ -317,16 +382,31 @@ export class OrdersService {
 
   private async decrementInventory(order: Order) {
     for (const item of order.items) {
-      const variant = await this.variantsRepository.findOne({
-        where: { id: item.variant.id },
-      });
+      const product = item.product
+        ? await this.productsRepository.findOne({ where: { id: item.product.id } })
+        : null;
 
-      if (variant) {
-        variant.stock -= item.quantity;
-        await this.variantsRepository.save(variant);
+      if (product) {
+        product.stock -= item.quantity;
+        await this.productsRepository.save(product);
+      }
 
+      let variant: ProductVariant | null = null;
+      if (item.variant) {
+        variant = await this.variantsRepository.findOne({
+          where: { id: item.variant.id },
+        });
+
+        if (variant) {
+          variant.stock -= item.quantity;
+          await this.variantsRepository.save(variant);
+        }
+      }
+
+      if (product || variant) {
         await this.inventoryRepository.save(
           this.inventoryRepository.create({
+            product,
             variant,
             quantityChange: -item.quantity,
             type: InventoryMovementType.SALE,

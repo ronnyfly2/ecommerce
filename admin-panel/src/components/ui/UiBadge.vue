@@ -9,12 +9,12 @@ defineProps<{
   <span
     :class="[
       'badge-base',
-      color === 'success' ? 'bg-[--color-success-100] text-[--color-success-700]' :
-      color === 'warning' ? 'bg-[--color-warning-100] text-[--color-warning-700]' :
-      color === 'danger'  ? 'bg-[--color-danger-100]  text-[--color-danger-700]'  :
-      color === 'info'    ? 'bg-[--color-info-100]    text-[--color-info-700]'    :
-      color === 'primary' ? 'bg-[--color-primary-100] text-[--color-primary-700]' :
-                            'bg-[--color-surface-100] text-[--color-surface-600]',
+      color === 'success' ? 'bg-success-100 text-success-700' :
+      color === 'warning' ? 'bg-warning-100 text-warning-700' :
+      color === 'danger'  ? 'bg-danger-100  text-danger-700'  :
+      color === 'info'    ? 'bg-info-100    text-info-700'    :
+      color === 'primary' ? 'bg-primary-100 text-primary-700' :
+                            'bg-surface-100 text-surface-600',
     ]"
   >
     <span

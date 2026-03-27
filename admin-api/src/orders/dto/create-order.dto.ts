@@ -38,9 +38,15 @@ export class ShippingAddressDto {
 }
 
 export class CreateOrderItemDto {
-  @ApiProperty({ example: 'f77222c7-2648-4ef4-8488-350f53e6805b' })
+  @ApiPropertyOptional({ example: 'f77222c7-2648-4ef4-8488-350f53e6805b' })
+  @IsOptional()
   @IsUUID()
-  variantId: string;
+  productId?: string;
+
+  @ApiPropertyOptional({ example: 'f77222c7-2648-4ef4-8488-350f53e6805b' })
+  @IsOptional()
+  @IsUUID()
+  variantId?: string;
 
   @ApiProperty({ example: 2 })
   @IsNumber()

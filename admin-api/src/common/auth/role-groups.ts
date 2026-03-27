@@ -97,3 +97,9 @@ export const CURRENCY_MANAGE_ROLES = [
   Role.SUPER_ADMIN,
   Role.ADMIN,
 ] as const satisfies readonly Role[];
+
+// Revisiones de productos
+export const REVIEW_APPROVE_ROLES = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+] as const satisfies readonly Role[];

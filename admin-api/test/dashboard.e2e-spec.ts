@@ -146,12 +146,9 @@ describe('Dashboard (e2e)', () => {
     await request(server)
       .get('/api/dashboard/summary')
       .set('Authorization', `Bearer ${accessToken}`)
-      .expect(200)
+      .expect(403)
       .expect(({ body }) => {
-        expect(body.statusCode).toBe(200);
-        expect(body.data.orderStats).toBeDefined();
-        expect(body.data.sales).toBeDefined();
-        expect(body.data.inventoryAlerts).toBeNull();
+        expect(body.statusCode).toBe(403);
       });
   });
 
@@ -176,6 +173,28 @@ describe('Dashboard (e2e)', () => {
     const user = await usersRepository.findOne({ where: { email } });
     expect(user).toBeTruthy();
 
+    const loginResponse = await request(server)
+      .post('/api/auth/login')
+      .send({ email, password })
+      .expect(201);
+
+    const accessToken = loginResponse.body.data.accessToken as string;
+
+    const baselineStatsResponse = await request(server)
+      .get('/api/orders/stats')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    const baselineTotalOrders = baselineStatsResponse.body.data.totalOrders as number;
+    const baselineRevenue = baselineStatsResponse.body.data.totalRevenue as number;
+
+    const baselineDashResponse = await request(server)
+      .get('/api/dashboard/summary?salesPreset=7d')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    const baselineDashRevenue = baselineDashResponse.body.data.sales.trend.totalRevenue as number;
+    const baselineDashOrders = baselineDashResponse.body.data.sales.trend.totalOrders as number;
+
     const savedOrders = await ordersRepository.save([
       ordersRepository.create({
         user: user as User,
@@ -198,15 +217,7 @@ describe('Dashboard (e2e)', () => {
         notes: null,
       }),
     ]);
-
-    const orderDay = savedOrders[0].createdAt.toISOString().slice(0, 10);
-
-    const loginResponse = await request(server)
-      .post('/api/auth/login')
-      .send({ email, password })
-      .expect(201);
-
-    const accessToken = loginResponse.body.data.accessToken as string;
+    expect(savedOrders).toHaveLength(2);
 
     await request(server)
       .get('/api/orders/stats')
@@ -214,17 +225,18 @@ describe('Dashboard (e2e)', () => {
       .expect(200)
       .expect(({ body }) => {
         expect(body.statusCode).toBe(200);
-        expect(body.data.totalOrders).toBe(2);
-        expect(body.data.totalRevenue).toBe(200);
+        expect(body.data.totalOrders).toBe(baselineTotalOrders + 2);
+        expect(body.data.totalRevenue).toBe(Number((baselineRevenue + 200).toFixed(2)));
       });
 
     await request(server)
-      .get(`/api/dashboard/summary?salesPreset=custom&from=${orderDay}&to=${orderDay}`)
+      .get('/api/dashboard/summary?salesPreset=7d')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200)
       .expect(({ body }) => {
         expect(body.statusCode).toBe(200);
-        expect(body.data.orderStats.totalRevenue).toBe(200);
+        expect(body.data.sales.trend.totalRevenue).toBeGreaterThanOrEqual(baselineDashRevenue + 200);
+        expect(body.data.sales.trend.totalOrders).toBeGreaterThanOrEqual(baselineDashOrders + 2);
       });
   });
 

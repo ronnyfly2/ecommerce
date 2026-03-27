@@ -4,7 +4,7 @@ import { Between, FindOptionsWhere, LessThanOrEqual, MoreThanOrEqual, Repository
 import { Role } from '../common/enums/role.enum';
 import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/entities/order.entity';
-import { ProductVariant } from '../products/entities/product-variant.entity';
+import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
 import { DashboardSalesPreset, DashboardSummaryQueryDto } from './dto/dashboard-summary-query.dto';
 
@@ -17,8 +17,8 @@ export class DashboardService {
     private readonly ordersService: OrdersService,
     @InjectRepository(Order)
     private readonly ordersRepository: Repository<Order>,
-    @InjectRepository(ProductVariant)
-    private readonly variantsRepository: Repository<ProductVariant>,
+    @InjectRepository(Product)
+    private readonly productsRepository: Repository<Product>,
   ) {}
 
   async getSummary(
@@ -37,37 +37,32 @@ export class DashboardService {
     }
 
     const [outOfStockCount, lowStockCount, lowStockVariants] = await Promise.all([
-      this.variantsRepository.count({
+      this.productsRepository.count({
         where: {
           isActive: true,
           stock: LessThanOrEqual(0),
-          product: { isActive: true },
         },
       }),
-      this.variantsRepository.count({
+      this.productsRepository.count({
         where: {
           isActive: true,
           stock: Between(1, LOW_STOCK_THRESHOLD),
-          product: { isActive: true },
         },
       }),
-      this.variantsRepository.find({
+      this.productsRepository.find({
         where: {
           isActive: true,
           stock: Between(1, LOW_STOCK_THRESHOLD),
-          product: { isActive: true },
         },
         relations: {
-          product: true,
-          size: true,
-          color: true,
+          category: true,
         },
         order: {
           stock: 'ASC',
           updatedAt: 'ASC',
         },
         take: LOW_STOCK_VARIANTS_LIMIT,
-      }).then((variants) => variants.filter((variant) => variant.stock <= LOW_STOCK_THRESHOLD)),
+      }).then((products) => products.filter((product) => product.stock <= LOW_STOCK_THRESHOLD)),
     ]);
 
     return {
@@ -81,9 +76,9 @@ export class DashboardService {
           id: variant.id,
           sku: variant.sku,
           stock: variant.stock,
-          productName: variant.product.name,
-          sizeName: variant.size.name,
-          colorName: variant.color.name,
+          productName: variant.name,
+          categoryName: variant.category?.name ?? null,
+          descriptor: this.buildInventoryDescriptor(variant),
         })),
       },
     };
@@ -274,8 +269,8 @@ export class DashboardService {
     const year = Number(yearRaw);
     const monthIndex = Number(monthRaw) - 1;
 
-    const parsed = new Date(year, monthIndex, 1);
-    if (Number.isNaN(parsed.getTime()) || parsed.getFullYear() !== year || parsed.getMonth() !== monthIndex) {
+    const parsed = new Date(Date.UTC(year, monthIndex, 1));
+    if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== monthIndex) {
       throw new BadRequestException('Invalid month format, expected YYYY-MM');
     }
 
@@ -291,13 +286,35 @@ export class DashboardService {
     return date.toISOString().slice(0, 10);
   }
 
+  /**
+   * Returns midnight UTC for the given date, so that toDayKey(startOfDay(d)) === toDayKey(d)
+   * regardless of the server's local timezone.
+   */
   private startOfDay(date: Date) {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
   }
 
   private addDays(date: Date, days: number) {
-    const next = new Date(date);
-    next.setDate(next.getDate() + days);
-    return next;
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days, 0, 0, 0, 0));
+  }
+
+  private buildInventoryDescriptor(product: Product) {
+    const parts: string[] = [];
+
+    if (product.weightValue && product.weightUnit) {
+      parts.push(`${product.weightValue} ${product.weightUnit}`);
+    }
+
+    if (product.lengthValue || product.widthValue || product.heightValue) {
+      parts.push(
+        `${product.lengthValue ?? 0} x ${product.widthValue ?? 0} x ${product.heightValue ?? 0} ${product.dimensionUnit ?? 'cm'}`,
+      );
+    }
+
+    if (product.attributeValues?.length) {
+      parts.push(`${product.attributeValues.length} atributo(s)`);
+    }
+
+    return parts.join(' · ') || null;
   }
 }

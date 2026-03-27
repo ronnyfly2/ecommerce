@@ -1,3 +1,5 @@
+import 'cypress-axe'
+
 // Cypress support file for E2E tests
 // This file runs before all tests and can contain custom commands and global hooks
 
@@ -21,3 +23,35 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 Cypress.Commands.overwrite('visit', (originalFn, url, options) => {
   return originalFn(url, { ...options, onBeforeLoad: () => {} })
 });
+
+Cypress.Commands.add('runA11yAudit', (context, options) => {
+  cy.injectAxe()
+  cy.checkA11y(
+    context,
+    {
+      includedImpacts: ['serious', 'critical'],
+      ...options,
+    },
+    (violations) => {
+      if (violations.length === 0) {
+        return
+      }
+
+      const details = violations
+        .map((violation) => {
+          const nodeDetails = violation.nodes
+            .map((node) => {
+              const selectors = node.target.join(', ')
+              const snippet = (node.html ?? '').replace(/\s+/g, ' ').slice(0, 180)
+              return `${selectors} => ${snippet}`
+            })
+            .join(' || ')
+
+          return `${violation.id}: ${nodeDetails}`
+        })
+        .join(' | ')
+
+      throw new Error(`Accessibility violations found: ${details}`)
+    },
+  )
+})

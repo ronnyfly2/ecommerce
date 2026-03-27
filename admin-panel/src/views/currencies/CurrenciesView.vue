@@ -9,8 +9,12 @@ import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiTable from '@/components/ui/UiTable.vue'
+import CatalogActionsHead from '@/components/catalog/CatalogActionsHead.vue'
+import CatalogActionsCell from '@/components/catalog/CatalogActionsCell.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { useToast } from '@/composables/useToast'
 import { setSystemCurrencyFromList } from '@/utils/system-currency'
 
@@ -131,15 +135,17 @@ onMounted(load)
 <template>
   <div class="space-y-4">
     <div class="flex flex-col gap-1">
-      <h1 class="text-xl font-semibold text-[--color-surface-900]">Tipo de moneda</h1>
-      <p class="text-sm text-[--color-surface-600]">
+      <h1 class="text-xl font-semibold text-surface-900">Tipo de moneda</h1>
+      <p class="text-sm text-surface-600">
         Administra monedas activas y su tipo de cambio respecto a USD.
       </p>
     </div>
 
-    <div class="flex justify-end">
-      <UiButton @click="openCreate">Nueva moneda</UiButton>
-    </div>
+    <ListViewToolbar>
+      <template #actions>
+        <UiButton @click="openCreate">Nueva moneda</UiButton>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
       <UiTable :data="currencies" :loading="tableLoading" loading-color="primary" loading-text="Cargando monedas..." empty-message="No hay monedas">
@@ -150,7 +156,7 @@ onMounted(load)
             <th class="table-th">Simbolo</th>
             <th class="table-th text-right">Tipo de cambio (1 USD = X)</th>
             <th class="table-th text-center">Estado</th>
-            <th class="table-th table-actions-th" />
+            <CatalogActionsHead />
           </tr>
         </template>
 
@@ -167,12 +173,11 @@ onMounted(load)
               {{ c.isActive ? 'Activa' : 'Inactiva' }}
             </UiBadge>
           </td>
-          <td class="table-td table-actions-td text-right">
-            <div class="flex items-center gap-2 justify-end">
-              <UiButton size="sm" variant="ghost" @click="openEdit(c)">Editar</UiButton>
-              <UiButton size="sm" variant="danger" @click="askDelete(c)">Eliminar</UiButton>
-            </div>
-          </td>
+          <CatalogActionsCell
+            :disable-delete="c.isDefault"
+            @edit="openEdit(c)"
+            @delete="askDelete(c)"
+          />
         </tr>
 
         <template #empty-actions>
@@ -182,30 +187,32 @@ onMounted(load)
     </UiCard>
 
     <UiModal :show="formModal.show" :title="formModal.isEdit ? 'Editar moneda' : 'Nueva moneda'" @close="formModal.show = false">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <FormModalLayout>
         <UiInput
           :model-value="formModal.code"
           label="Codigo"
+          size="lg"
           required
           placeholder="USD"
           hint="Tres letras, por ejemplo USD, PEN"
           @update:model-value="(value) => formModal.code = normalizeCode(String(value ?? ''))"
         />
-        <UiInput v-model="formModal.name" label="Nombre" required placeholder="US Dollar" />
-        <UiInput v-model="formModal.symbol" label="Simbolo" required placeholder="$" />
+        <UiInput v-model="formModal.name" label="Nombre" size="lg" required placeholder="US Dollar" />
+        <UiInput v-model="formModal.symbol" label="Simbolo" size="lg" required placeholder="$" />
         <UiInput
           v-model="formModal.exchangeRateToUsd"
           type="number"
           step="0.000001"
           min="0.000001"
           label="Tipo de cambio"
+          size="lg"
           hint="Cuantas unidades de esta moneda equivalen a 1 USD"
         />
         <div class="md:col-span-2 flex gap-6">
           <FormToggleField v-model="formModal.isActive" label="Activa" />
           <FormToggleField v-model="formModal.isDefault" label="Default" />
         </div>
-      </div>
+      </FormModalLayout>
 
       <template #footer>
         <FormModalActions

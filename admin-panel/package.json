@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "e2e": "cypress run",
     "e2e:open": "cypress open",
+    "e2e:run:a11y": "cypress run --spec 'cypress/e2e/accessibility.a11y.cy.ts'",
     "e2e:run:orders": "cypress run --spec 'cypress/e2e/orders.role-filtering.cy.ts'",
     "e2e:run:errors": "cypress run --spec 'cypress/e2e/error-handling.cy.ts'"
   },

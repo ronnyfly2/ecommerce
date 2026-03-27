@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useNotificationsStore } from '@/stores/notifications'
@@ -10,7 +10,10 @@ const route = useRoute()
 const router = useRouter()
 const notifications = useNotificationsStore()
 const menuRef = ref<HTMLElement | null>(null)
+const notificationButtonRef = ref<HTMLButtonElement | null>(null)
+const notificationPanelRef = ref<HTMLElement | null>(null)
 const panelOpen = ref(false)
+const panelId = `notifications-panel-${Math.random().toString(36).slice(2, 10)}`
 const typeOptions: Array<{ value: '' | NotificationType; label: string }> = [
   { value: '', label: 'Todas' },
   { value: NotificationType.ORDER_CREATED, label: 'Compras' },
@@ -35,6 +38,18 @@ function formatRelative(dateValue: string): string {
   return `Hace ${diffDays} d`
 }
 
+function closeNotifications(options?: { restoreFocus?: boolean }) {
+  panelOpen.value = false
+  if (options?.restoreFocus !== false) {
+    notificationButtonRef.value?.focus()
+  }
+}
+
+function notificationButtonLabel() {
+  if (notifications.unreadCount <= 0) return 'Notificaciones'
+  return `Notificaciones, ${notifications.unreadCount} sin leer`
+}
+
 function toggleNotifications() {
   panelOpen.value = !panelOpen.value
   if (panelOpen.value && !notifications.initialized) {
@@ -53,7 +68,7 @@ async function handleMarkAllRead() {
 
 async function handleNotificationClick(id: string, link: string | null) {
   await notifications.markAsRead(id)
-  panelOpen.value = false
+  closeNotifications({ restoreFocus: false })
 
   if (link) {
     await router.push(link)
@@ -67,32 +82,50 @@ function onDocumentClick(event: MouseEvent) {
 
   const target = event.target as Node | null
   if (target && !menuRef.value.contains(target)) {
-    panelOpen.value = false
+    closeNotifications({ restoreFocus: false })
   }
 }
+
+function onDocumentKeydown(event: KeyboardEvent) {
+  if (!panelOpen.value) return
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeNotifications()
+  }
+}
+
+watch(panelOpen, async (isOpen) => {
+  if (isOpen) {
+    await nextTick()
+    notificationPanelRef.value?.focus()
+  }
+})
 
 onMounted(() => {
   notifications.startRealtime()
   document.addEventListener('click', onDocumentClick)
+  document.addEventListener('keydown', onDocumentKeydown)
 })
 
 onUnmounted(() => {
   notifications.stopRealtime()
   document.removeEventListener('click', onDocumentClick)
+  document.removeEventListener('keydown', onDocumentKeydown)
 })
 </script>
 
 <template>
   <header
     :class="[
-      'fixed top-0 right-0 left-0 h-16 bg-[--color-surface-0] border-b border-[--color-surface-200] flex items-center px-4 gap-4 transition-all duration-300 z-40',
+      'fixed top-0 right-0 left-0 h-16 bg-surface-100 border-b border-surface-200 flex items-center px-4 gap-4 transition-all duration-300 z-40',
       ui.sidebarCollapsed ? 'lg:left-16' : 'lg:left-65',
     ]"
-    style="z-index: 40"
   >
     <!-- Toggle sidebar (desktop) -->
     <button
       class="btn-base btn-ghost btn-sm p-2 hidden lg:flex"
+      :aria-label="ui.sidebarCollapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'"
       @click="ui.toggleSidebar"
       :title="ui.sidebarCollapsed ? 'Expandir' : 'Colapsar'"
     >
@@ -104,6 +137,7 @@ onUnmounted(() => {
     <!-- Toggle sidebar (mobile) -->
     <button
       class="btn-base btn-ghost btn-sm p-2 lg:hidden"
+      aria-label="Abrir menú lateral"
       @click="ui.toggleMobileSidebar"
     >
       <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -116,8 +150,13 @@ onUnmounted(() => {
     <div class="ml-auto flex items-center gap-2">
       <div ref="menuRef" class="relative">
         <button
+          ref="notificationButtonRef"
           class="btn-base btn-ghost btn-sm p-2 relative"
           title="Notificaciones"
+          :aria-label="notificationButtonLabel()"
+          :aria-controls="panelOpen ? panelId : undefined"
+          :aria-expanded="panelOpen ? 'true' : 'false'"
+          aria-haspopup="dialog"
           @click.stop="toggleNotifications"
         >
           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -126,6 +165,7 @@ onUnmounted(() => {
           <span
             v-if="notifications.unreadCount > 0"
             class="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[11px] font-semibold flex items-center justify-center"
+            aria-hidden="true"
           >
             {{ notifications.unreadCount > 99 ? '99+' : notifications.unreadCount }}
           </span>
@@ -133,10 +173,16 @@ onUnmounted(() => {
 
         <div
           v-if="panelOpen"
-          class="absolute right-0 mt-2 w-85 max-w-[90vw] bg-[--color-surface-0] border border-[--color-surface-200] rounded-xl shadow-xl overflow-hidden"
+          :id="panelId"
+          ref="notificationPanelRef"
+          class="absolute right-0 mt-2 w-85 max-w-[90vw] bg-surface-0 border border-surface-200 rounded-xl shadow-xl overflow-hidden"
+          role="dialog"
+          aria-modal="false"
+          aria-label="Panel de notificaciones"
+          tabindex="-1"
         >
-          <div class="px-4 py-3 border-b border-[--color-surface-200] flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-[--color-surface-900]">Notificaciones</h3>
+          <div class="px-4 py-3 border-b border-surface-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-surface-900">Notificaciones</h3>
             <div class="flex items-center gap-1">
               <button
                 class="btn-base btn-ghost btn-sm px-2 py-1 text-xs"
@@ -154,49 +200,56 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="px-3 py-2 border-b border-[--color-surface-200] flex gap-1 overflow-x-auto">
+          <div class="px-3 py-2 border-b border-surface-200 flex gap-1 overflow-x-auto">
             <button
               v-for="option in typeOptions"
               :key="option.label"
               class="px-2.5 py-1 text-xs rounded-full border whitespace-nowrap"
+              :aria-pressed="notifications.activeTypeFilter === option.value ? 'true' : 'false'"
               :class="notifications.activeTypeFilter === option.value
-                ? 'bg-[--color-primary-600] text-white border-[--color-primary-600]'
-                : 'bg-[--color-surface-0] text-[--color-surface-700] border-[--color-surface-300]'"
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-surface-0 text-surface-700 border-surface-300'"
               @click="handleTypeFilterChange(option.value)"
             >
               {{ option.label }}
             </button>
           </div>
 
-          <div v-if="notifications.loading" class="p-4 text-sm text-[--color-surface-500]">
+          <div v-if="notifications.loading" class="p-4 text-sm text-surface-500">
             Cargando...
           </div>
 
           <div
             v-else-if="notifications.items.length === 0"
-            class="p-4 text-sm text-[--color-surface-500]"
+            class="p-4 text-sm text-surface-500"
           >
             No hay notificaciones recientes.
           </div>
 
-          <ul v-else class="max-h-105 overflow-y-auto divide-y divide-[--color-surface-200]">
+          <ul v-else class="max-h-105 overflow-y-auto divide-y divide-surface-200">
             <li
               v-for="item in notifications.items"
               :key="item.id"
-              class="px-4 py-3 hover:bg-[--color-surface-100] cursor-pointer"
-              @click="handleNotificationClick(item.id, item.link)"
             >
-              <div class="flex items-start gap-2">
-                <span
-                  class="mt-1 w-2 h-2 rounded-full"
-                  :class="item.isRead ? 'bg-[--color-surface-300]' : 'bg-[--color-primary-500]'"
-                />
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-[--color-surface-900] truncate">{{ item.title }}</p>
-                  <p class="text-xs text-[--color-surface-600] mt-0.5">{{ item.message }}</p>
-                  <p class="text-[11px] text-[--color-surface-500] mt-1">{{ formatRelative(item.createdAt) }}</p>
+              <button
+                type="button"
+                class="w-full px-4 py-3 text-left hover:bg-surface-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-[-2px]"
+                :aria-label="`${item.title}. ${item.message}. ${formatRelative(item.createdAt)}`"
+                @click="handleNotificationClick(item.id, item.link)"
+              >
+                <div class="flex items-start gap-2">
+                  <span
+                    class="mt-1 w-2 h-2 rounded-full"
+                    :class="item.isRead ? 'bg-surface-300' : 'bg-primary-500'"
+                    aria-hidden="true"
+                  />
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-surface-900 truncate">{{ item.title }}</p>
+                    <p class="text-xs text-surface-600 mt-0.5">{{ item.message }}</p>
+                    <p class="text-[11px] text-surface-500 mt-1">{{ formatRelative(item.createdAt) }}</p>
+                  </div>
                 </div>
-              </div>
+              </button>
             </li>
           </ul>
         </div>

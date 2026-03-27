@@ -17,6 +17,9 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
+import UiInput from '@/components/ui/UiInput.vue'
+import UiSelect from '@/components/ui/UiSelect.vue'
+import FormToggleField from '@/components/forms/FormToggleField.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -148,6 +151,33 @@ function fmtDefault(n: string | number, fromCode: string) {
   const converted = convertBetweenCurrencies(n, fromCode, defaultCurrencyCode.value)
   return formatMoney(converted, defaultCurrencyCode.value)
 }
+
+function productProfileSummary(product: Product) {
+  const parts: string[] = []
+
+  if (product.category?.supportsWeight && product.weightValue && product.weightUnit) {
+    parts.push(`${product.weightValue} ${product.weightUnit}`)
+  }
+
+  if (
+    product.category?.supportsDimensions &&
+    (product.lengthValue || product.widthValue || product.heightValue)
+  ) {
+    parts.push(
+      `${product.lengthValue || 0} x ${product.widthValue || 0} x ${product.heightValue || 0} ${product.dimensionUnit || 'cm'}`,
+    )
+  }
+
+  if (product.attributeValues?.length) {
+    parts.push(`${product.attributeValues.length} atributo(s)`)
+  }
+
+  return parts.join(' · ') || 'Perfil genérico'
+}
+
+function productModelLabel(product: Product) {
+  return product.category?.supportsSizeColorVariants ? 'Con versiones' : 'Producto directo'
+}
 </script>
 
 <template>
@@ -155,10 +185,12 @@ function fmtDefault(n: string | number, fromCode: string) {
     <!-- Toolbar -->
     <div class="flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <input
+        <UiInput
           v-model="search"
-          class="input-base max-w-xs"
+          size="sm"
+          aria-label="Buscar productos"
           placeholder="Buscar productos…"
+          class="max-w-xs"
         />
         <UiButton
           v-if="canManageProducts"
@@ -174,25 +206,37 @@ function fmtDefault(n: string | number, fromCode: string) {
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <select v-model="categoryId" class="input-base">
-          <option value="">Todas las categorias</option>
-          <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
+        <UiSelect
+          v-model="categoryId"
+          size="sm"
+          aria-label="Filtrar por categoría"
+          :options="[
+            { value: '', label: 'Todas las categorias' },
+            ...categories.map((category) => ({ value: category.id, label: category.name })),
+          ]"
+        />
 
-        <select v-model="tagId" class="input-base">
-          <option value="">Todos los tags</option>
-          <option v-for="t in tags" :key="t.id" :value="t.id">{{ t.name }}</option>
-        </select>
+        <UiSelect
+          v-model="tagId"
+          size="sm"
+          aria-label="Filtrar por tag"
+          :options="[
+            { value: '', label: 'Todos los tags' },
+            ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
+          ]"
+        />
 
-        <select v-model="currencyCode" class="input-base">
-          <option value="">Todas las monedas</option>
-          <option v-for="c in currencies" :key="c.id" :value="c.code">{{ c.code }} ({{ c.symbol }})</option>
-        </select>
+        <UiSelect
+          v-model="currencyCode"
+          size="sm"
+          aria-label="Filtrar por moneda"
+          :options="[
+            { value: '', label: 'Todas las monedas' },
+            ...currencies.map((currency) => ({ value: currency.code, label: `${currency.code} (${currency.symbol})` })),
+          ]"
+        />
 
-        <label class="flex items-center gap-2 rounded-xl border border-[--color-surface-200] px-3 py-2 text-sm text-[--color-surface-700]">
-          <input v-model="offerOnly" type="checkbox" class="accent-[--color-primary-600]" />
-          Solo productos en oferta
-        </label>
+        <FormToggleField v-model="offerOnly" label="Solo productos en oferta" variant="card" size="sm" />
       </div>
     </div>
 
@@ -203,11 +247,13 @@ function fmtDefault(n: string | number, fromCode: string) {
           <tr>
             <th class="table-th">Producto</th>
             <th class="table-th">Categoría</th>
+            <th class="table-th">Perfil</th>
             <th class="table-th text-center">Moneda</th>
             <th class="table-th text-right">Precio base</th>
             <th class="table-th text-right">Precio default ({{ defaultCurrencyCode }})</th>
             <th class="table-th text-right">Oferta</th>
-            <th class="table-th text-center">Variantes</th>
+            <th class="table-th text-center">Stock</th>
+            <th class="table-th text-center">Versiones</th>
             <th class="table-th text-center">Estado</th>
             <th class="table-th table-actions-th" />
           </tr>
@@ -221,7 +267,7 @@ function fmtDefault(n: string | number, fromCode: string) {
           <td class="table-td">
             <div class="flex items-center gap-3">
               <div
-                class="w-10 h-10 rounded-lg overflow-hidden bg-[--color-surface-100] shrink-0"
+                class="w-10 h-10 rounded-lg overflow-hidden bg-surface-100 shrink-0"
               >
                 <img
                   v-if="p.images?.[0]?.url"
@@ -229,31 +275,42 @@ function fmtDefault(n: string | number, fromCode: string) {
                   :alt="p.name"
                   class="w-full h-full object-cover"
                 />
-                <div v-else class="w-full h-full flex items-center justify-center text-[--color-surface-300]">
+                <div v-else class="w-full h-full flex items-center justify-center text-surface-300">
                   <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                   </svg>
                 </div>
               </div>
               <div>
-                <p class="font-medium text-[--color-surface-900]">{{ p.name }}</p>
+                <p class="font-medium text-surface-900">{{ p.name }}</p>
                 <p class="text-caption">{{ p.slug }}</p>
                 <p class="text-caption font-mono">SKU: {{ p.sku }}</p>
               </div>
             </div>
           </td>
-          <td class="table-td text-muted">{{ p.category?.name ?? '—' }}</td>
+          <td class="table-td text-muted">
+            <div>{{ p.category?.name ?? '—' }}</div>
+            <div class="text-xs">{{ productModelLabel(p) }}</div>
+          </td>
+          <td class="table-td text-muted">
+            <div class="text-sm text-surface-700">{{ productProfileSummary(p) }}</div>
+          </td>
           <td class="table-td text-center text-xs text-muted">{{ p.currencyCode }}</td>
           <td class="table-td text-right font-medium">{{ fmt(p.basePrice, p.currencyCode) }}</td>
           <td class="table-td text-right">{{ fmtDefault(p.basePrice, p.currencyCode) }}</td>
           <td class="table-td text-right">
-            <span v-if="p.hasOffer" class="text-[--color-success-700] font-medium">
+            <span v-if="p.hasOffer" class="text-success-700 font-medium">
               {{ fmt(p.offerPrice || 0, p.currencyCode) }}
             </span>
             <span v-else class="text-muted">—</span>
           </td>
           <td class="table-td text-center">
-            <span class="text-muted">{{ p.variants?.length ?? 0 }}</span>
+            <UiBadge :color="p.stock > 0 ? 'success' : 'danger'" dot>
+              {{ p.stock }}
+            </UiBadge>
+          </td>
+          <td class="table-td text-center">
+            <span class="text-muted">{{ p.variantProducts?.length ?? 0 }}</span>
           </td>
           <td class="table-td text-center">
             <UiBadge :color="p.isActive ? 'success' : 'neutral'" dot>
@@ -291,7 +348,7 @@ function fmtDefault(n: string | number, fromCode: string) {
         </template>
       </UiTable>
 
-      <div class="p-4 border-t border-[--color-surface-200]">
+      <div class="p-4 border-t border-surface-200">
         <UiPagination
           :page="pg.page.value"
           :total-pages="pg.totalPages.value"

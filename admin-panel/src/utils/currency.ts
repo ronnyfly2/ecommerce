@@ -2,9 +2,12 @@ import { getSystemCurrencyCode } from '@/utils/system-currency'
 
 export function formatMoney(value: string | number, currencyCode = '', locale = 'es-PE') {
   const resolvedCurrency = currencyCode || getSystemCurrencyCode()
-  return Number(value).toLocaleString(locale, {
+  const numeric = Number(value)
+
+  return (Number.isFinite(numeric) ? numeric : 0).toLocaleString(locale, {
     style: 'currency',
     currency: resolvedCurrency,
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })
 }

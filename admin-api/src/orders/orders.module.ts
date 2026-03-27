@@ -5,6 +5,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { ShippingAddress } from './entities/shipping-address.entity';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
+import { Product } from '../products/entities/product.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { Coupon } from '../coupons/entities/coupon.entity';
 import { CouponUsage } from '../coupons/entities/coupon-usage.entity';
@@ -21,6 +22,7 @@ import { CurrenciesModule } from '../currencies/currencies.module';
       Order,
       OrderItem,
       ShippingAddress,
+      Product,
       ProductVariant,
       Coupon,
       CouponUsage,

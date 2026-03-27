@@ -8,14 +8,28 @@ import UiInput from '@/components/ui/UiInput.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiTable from '@/components/ui/UiTable.vue'
+import CatalogAuditHead from '@/components/catalog/CatalogAuditHead.vue'
+import CatalogAuditCells from '@/components/catalog/CatalogAuditCells.vue'
+import CatalogActionsHead from '@/components/catalog/CatalogActionsHead.vue'
+import CatalogActionsCell from '@/components/catalog/CatalogActionsCell.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
+import FormModalLayout from '@/components/forms/FormModalLayout.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
 const sizes = ref<Size[] | null>(null)
 const tableLoading = computed(() => sizes.value === null)
 
-const formModal = reactive({ show: false, loading: false, isEdit: false, id: '', name: '', abbreviation: '' })
+const formModal = reactive({
+  show: false,
+  loading: false,
+  isEdit: false,
+  id: '',
+  name: '',
+  abbreviation: '',
+  displayOrder: 0,
+})
 const confirm = reactive({ show: false, id: '', name: '', loading: false })
 
 async function load() {
@@ -33,6 +47,7 @@ function openCreate() {
   formModal.id = ''
   formModal.name = ''
   formModal.abbreviation = ''
+  formModal.displayOrder = 0
   formModal.show = true
 }
 
@@ -41,6 +56,7 @@ function openEdit(size: Size) {
   formModal.id = size.id
   formModal.name = size.name
   formModal.abbreviation = size.abbreviation
+  formModal.displayOrder = Number(size.displayOrder ?? 0)
   formModal.show = true
 }
 
@@ -54,6 +70,7 @@ async function saveSize() {
     const payload = {
       name: formModal.name.trim(),
       abbreviation: normalizedAbbreviation(formModal.abbreviation),
+      displayOrder: Number(formModal.displayOrder),
     }
 
     if (formModal.isEdit) {
@@ -98,31 +115,32 @@ onMounted(load)
 
 <template>
   <div class="space-y-4">
-    <div class="flex justify-end">
-      <UiButton @click="openCreate">Nueva talla</UiButton>
-    </div>
+    <ListViewToolbar>
+      <template #actions>
+        <UiButton @click="openCreate">Nueva talla</UiButton>
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="sizes" :loading="tableLoading" loading-color="primary" loading-text="Cargando tallas..." no-min-width empty-message="No hay tallas">
+      <UiTable :data="sizes" :loading="tableLoading" loading-color="primary" loading-text="Cargando tallas..." empty-message="No hay tallas">
         <template #head>
           <tr>
             <th class="table-th">Nombre</th>
             <th class="table-th">Prefijo</th>
-            <th class="table-th">Creado</th>
-            <th class="table-th table-actions-th" />
+            <th class="table-th text-center">Orden</th>
+            <CatalogAuditHead />
+            <CatalogActionsHead />
           </tr>
         </template>
 
         <tr v-for="s in sizes ?? []" :key="s.id" class="table-tr-hover">
-          <td class="table-td font-medium">{{ s.name }}</td>
-          <td class="table-td font-mono text-xs">{{ s.abbreviation }}</td>
-          <td class="table-td text-muted text-xs">{{ new Date(s.createdAt).toLocaleDateString('es-AR') }}</td>
-          <td class="table-td table-actions-td text-right">
-            <div class="flex items-center gap-2 justify-end">
-              <UiButton size="sm" variant="ghost" @click="openEdit(s)">Editar</UiButton>
-              <UiButton size="sm" variant="danger" @click="askDelete(s)">Eliminar</UiButton>
-            </div>
+          <td class="table-td">
+            <span class="font-medium text-surface-900">{{ s.name }}</span>
           </td>
+          <td class="table-td font-mono text-xs">{{ s.abbreviation }}</td>
+          <td class="table-td text-center">{{ s.displayOrder }}</td>
+          <CatalogAuditCells :created-at="s.createdAt" :updated-at="s.updatedAt" />
+          <CatalogActionsCell @edit="openEdit(s)" @delete="askDelete(s)" />
         </tr>
 
         <template #empty-actions>
@@ -132,17 +150,25 @@ onMounted(load)
     </UiCard>
 
     <UiModal :show="formModal.show" :title="formModal.isEdit ? 'Editar talla' : 'Nueva talla'" @close="formModal.show = false">
-      <div class="space-y-4">
-        <UiInput v-model="formModal.name" label="Nombre" required placeholder="Large, Medium, Small..." />
+      <FormModalLayout :columns="1">
+        <UiInput v-model="formModal.name" label="Nombre" size="lg" required placeholder="Large, Medium, Small..." />
         <UiInput
           :model-value="formModal.abbreviation"
           label="Prefijo / abreviatura"
+          size="lg"
           required
           placeholder="L, M, S..."
           hint="Ejemplo: Large = L, Medium = M"
           @update:model-value="(value) => formModal.abbreviation = normalizedAbbreviation(String(value ?? ''))"
         />
-      </div>
+        <UiInput
+          v-model="formModal.displayOrder"
+          type="number"
+          min="0"
+          label="Orden de visualización"
+          size="lg"
+        />
+      </FormModalLayout>
       <template #footer>
         <FormModalActions
           :loading="formModal.loading"

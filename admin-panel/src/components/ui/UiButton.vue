@@ -12,6 +12,8 @@ defineProps<{
   <button
     :type="type ?? 'button'"
     :disabled="disabled || loading"
+    :aria-busy="loading ? 'true' : undefined"
+    :aria-disabled="disabled || loading ? 'true' : undefined"
     :class="[
       'btn-base',
       size === 'sm' ? '' : 'w-full sm:w-auto',
@@ -26,6 +28,7 @@ defineProps<{
     <svg
       v-if="loading"
       class="animate-spin"
+      aria-hidden="true"
       :style="{ width: size === 'sm' ? '12px' : '16px', height: size === 'sm' ? '12px' : '16px' }"
       xmlns="http://www.w3.org/2000/svg"
       fill="none"

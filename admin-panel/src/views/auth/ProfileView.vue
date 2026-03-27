@@ -28,13 +28,100 @@ const showLocalSeedConfig = import.meta.env.DEV
 const seedActionLoading = ref<
   'run' | 'clean-seed' | 'clean-seed-force' | 'clean-users-all' | 'clean-all' | null
 >(null)
-const seedActionResult = ref<string>('')
+const seedActionResult = ref<Record<string, unknown> | null>(null)
+const seedActionError = ref('')
 const confirmModalOpen = ref(false)
 const confirmInput = ref('')
 const pendingDestructiveAction = ref<
   'clean-seed-force' | 'clean-users-all' | 'clean-all' | null
 >(null)
 const confirmKeyword = 'CONFIRMAR'
+
+const seedModeLabel = computed(() => {
+  const mode = seedActionResult.value?.mode
+  return typeof mode === 'string' ? mode : '—'
+})
+
+const seedModeBadgeColor = computed(() => {
+  const mode = seedModeLabel.value
+  if (mode === 'seed-run' || mode === 'seed-safe') return 'success'
+  if (mode === 'seed-force') return 'warning'
+  if (mode === 'users-all' || mode === 'all') return 'danger'
+  return 'neutral'
+})
+
+const seedModeDisplayLabel = computed(() => {
+  const mode = seedModeLabel.value
+  if (mode === 'seed-run') return 'Seed ejecutado'
+  if (mode === 'seed-safe') return 'Limpieza seed (safe)'
+  if (mode === 'seed-force') return 'Limpieza seed (force)'
+  if (mode === 'users-all') return 'Borrado total de usuarios'
+  if (mode === 'all') return 'Vaciado total de BD'
+  return mode
+})
+
+const seedResultPanelClass = computed(() => {
+  const mode = seedModeLabel.value
+  if (mode === 'seed-run' || mode === 'seed-safe') {
+    return 'border-success-200 bg-success-50'
+  }
+  if (mode === 'seed-force') {
+    return 'border-warning-200 bg-warning-50'
+  }
+  if (mode === 'users-all' || mode === 'all') {
+    return 'border-danger-200 bg-danger-50'
+  }
+  return 'border-surface-200 bg-surface-0'
+})
+
+const confirmModalBadgeColor = computed(() => {
+  const action = pendingDestructiveAction.value
+  if (action === 'clean-seed-force') return 'warning'
+  if (action === 'clean-users-all' || action === 'clean-all') return 'danger'
+  return 'neutral'
+})
+
+const confirmModalPanelClass = computed(() => {
+  const action = pendingDestructiveAction.value
+  if (action === 'clean-seed-force') return 'border-warning-200 bg-warning-50'
+  if (action === 'clean-users-all' || action === 'clean-all') return 'border-danger-200 bg-danger-50'
+  return 'border-surface-200 bg-surface-50'
+})
+
+const seedStartedAtLabel = computed(() => {
+  const startedAt = seedActionResult.value?.startedAt
+  if (typeof startedAt !== 'string') return '—'
+  return new Date(startedAt).toLocaleString('es-AR')
+})
+
+const seedFinishedAtLabel = computed(() => {
+  const finishedAt = seedActionResult.value?.finishedAt
+  if (typeof finishedAt !== 'string') return '—'
+  return new Date(finishedAt).toLocaleString('es-AR')
+})
+
+const seedDurationMsLabel = computed(() => {
+  const durationMs = seedActionResult.value?.durationMs
+  if (typeof durationMs !== 'number') return '—'
+  return `${durationMs} ms`
+})
+
+const seedTablesTruncatedLabel = computed(() => {
+  const tablesTruncated = seedActionResult.value?.tablesTruncated
+  if (typeof tablesTruncated !== 'number') return '—'
+  return String(tablesTruncated)
+})
+
+const seedTruncatedTables = computed(() => {
+  const tables = seedActionResult.value?.truncatedTables
+  if (!Array.isArray(tables)) return []
+  return tables.filter((item): item is string => typeof item === 'string')
+})
+
+const seedActionResultPretty = computed(() => {
+  if (!seedActionResult.value) return ''
+  return JSON.stringify(seedActionResult.value, null, 2)
+})
 
 function parseSeedEmails(value: string | undefined, fallback: string[]): string[] {
   if (!value) return fallback
@@ -99,7 +186,8 @@ async function executeSeedAction(
   confirmationPhrase?: string,
 ) {
   seedActionLoading.value = action
-  seedActionResult.value = ''
+  seedActionResult.value = null
+  seedActionError.value = ''
 
   try {
     let result: Record<string, unknown>
@@ -117,11 +205,11 @@ async function executeSeedAction(
         'clean-all': 'all',
       }
 
-      const force = action === 'clean-seed-force'
+      const force = action === 'clean-seed-force' || action === 'clean-all'
       result = (await adminToolsService.cleanSeed(modeByAction[action], force, confirmationPhrase)) as Record<string, unknown>
     }
 
-    seedActionResult.value = JSON.stringify(result, null, 2)
+    seedActionResult.value = result
     toast.success('Seed ejecutado')
 
     // Si se regeneran usuarios seed, refresca sesión para actualizar estado local.
@@ -129,7 +217,7 @@ async function executeSeedAction(
   } catch (error) {
     const printable = extractErrorMessage(error, 'No se pudo ejecutar la accion de seed')
     toast.error('Error', printable)
-    seedActionResult.value = printable
+    seedActionError.value = printable
   } finally {
     seedActionLoading.value = null
   }
@@ -219,11 +307,11 @@ onMounted(loadSessions)
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
         <div>
           <p class="text-caption mb-1">Nombre</p>
-          <p class="font-medium text-[--color-surface-900]">{{ auth.fullName || '—' }}</p>
+          <p class="font-medium text-surface-900">{{ auth.fullName || '—' }}</p>
         </div>
         <div>
           <p class="text-caption mb-1">Email</p>
-          <p class="font-medium text-[--color-surface-900]">{{ auth.user?.email }}</p>
+          <p class="font-medium text-surface-900">{{ auth.user?.email }}</p>
         </div>
         <div>
           <p class="text-caption mb-1">Rol</p>
@@ -260,7 +348,7 @@ onMounted(loadSessions)
 
           <tr v-for="s in sessions ?? []" :key="s.tokenId" class="table-tr-hover">
             <td class="table-td">
-              <p class="font-medium text-[--color-surface-900]">{{ s.deviceName || 'Dispositivo desconocido' }}</p>
+              <p class="font-medium text-surface-900">{{ s.deviceName || 'Dispositivo desconocido' }}</p>
               <p class="text-caption truncate max-w-65">{{ s.userAgent || '—' }}</p>
             </td>
             <td class="table-td text-muted">{{ s.ipAddress || '—' }}</td>
@@ -286,12 +374,12 @@ onMounted(loadSessions)
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
         <div class="md:col-span-2">
           <p class="text-caption mb-1">API base URL</p>
-          <p class="font-mono text-xs bg-[--color-surface-100] rounded-md px-3 py-2 text-[--color-surface-800]">
+          <p class="font-mono text-xs bg-surface-100 rounded-md px-3 py-2 text-surface-800">
             {{ localSeedConfig.apiBaseUrl }}
           </p>
         </div>
 
-        <div class="rounded-lg border border-[--color-surface-200] p-4">
+        <div class="rounded-lg border border-surface-200 p-4">
           <div class="flex items-start justify-between gap-3 mb-2">
             <p class="text-caption">SUPER_ADMIN</p>
             <UiButton size="sm" variant="ghost" @click="copyRoleCredentials('SUPER_ADMIN')">
@@ -302,7 +390,7 @@ onMounted(loadSessions)
             <p
               v-for="email in localSeedConfig.superAdminEmails"
               :key="email"
-              class="font-medium text-[--color-surface-900] break-all"
+              class="font-medium text-surface-900 break-all"
             >
               {{ email }}
             </p>
@@ -310,7 +398,7 @@ onMounted(loadSessions)
           <p class="font-mono text-xs text-muted mt-1">{{ localSeedConfig.superAdminPassword }}</p>
         </div>
 
-        <div class="rounded-lg border border-[--color-surface-200] p-4">
+        <div class="rounded-lg border border-surface-200 p-4">
           <div class="flex items-start justify-between gap-3 mb-2">
             <p class="text-caption">ADMIN</p>
             <UiButton size="sm" variant="ghost" @click="copyRoleCredentials('ADMIN')">
@@ -321,7 +409,7 @@ onMounted(loadSessions)
             <p
               v-for="email in localSeedConfig.adminEmails"
               :key="email"
-              class="font-medium text-[--color-surface-900] break-all"
+              class="font-medium text-surface-900 break-all"
             >
               {{ email }}
             </p>
@@ -329,7 +417,7 @@ onMounted(loadSessions)
           <p class="font-mono text-xs text-muted mt-1">{{ localSeedConfig.adminPassword }}</p>
         </div>
 
-        <div class="rounded-lg border border-[--color-surface-200] p-4 md:col-span-2">
+        <div class="rounded-lg border border-surface-200 p-4 md:col-span-2">
           <div class="flex items-start justify-between gap-3 mb-2">
             <p class="text-caption">CUSTOMER</p>
             <UiButton size="sm" variant="ghost" @click="copyRoleCredentials('CUSTOMER')">
@@ -340,7 +428,7 @@ onMounted(loadSessions)
             <p
               v-for="email in localSeedConfig.customerEmails"
               :key="email"
-              class="font-medium text-[--color-surface-900] break-all"
+              class="font-medium text-surface-900 break-all"
             >
               {{ email }}
             </p>
@@ -363,12 +451,62 @@ onMounted(loadSessions)
           Borrar todos los usuarios
         </UiButton>
         <UiButton class="md:col-span-2" variant="danger" :loading="seedActionLoading === 'clean-all'" @click="requestSeedAction('clean-all')">
-          Vaciar toda la BD
+          Vaciar toda la BD (force)
         </UiButton>
       </div>
 
-      <div v-if="seedActionResult" class="mt-4 rounded-lg bg-[--color-surface-900] text-[--color-surface-0] p-3 overflow-auto">
-        <pre class="text-xs whitespace-pre-wrap">{{ seedActionResult }}</pre>
+      <div v-if="seedActionResult || seedActionError" class="mt-4 space-y-3">
+        <div v-if="seedActionError" class="rounded-lg border border-danger-200 bg-danger-50 p-3 text-danger-800 text-sm">
+          {{ seedActionError }}
+        </div>
+
+        <div v-if="seedActionResult" class="rounded-lg border p-4 space-y-3" :class="seedResultPanelClass">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm font-semibold text-surface-900">Resultado de seed</p>
+            <UiBadge :color="seedModeBadgeColor" dot>{{ seedModeDisplayLabel }}</UiBadge>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+            <div class="rounded-md bg-surface-100 px-3 py-2">
+              <p class="text-caption">Modo</p>
+              <p class="font-medium text-surface-900">{{ seedModeLabel }}</p>
+            </div>
+            <div class="rounded-md bg-surface-100 px-3 py-2">
+              <p class="text-caption">Inicio</p>
+              <p class="font-medium text-surface-900">{{ seedStartedAtLabel }}</p>
+            </div>
+            <div class="rounded-md bg-surface-100 px-3 py-2">
+              <p class="text-caption">Fin</p>
+              <p class="font-medium text-surface-900">{{ seedFinishedAtLabel }}</p>
+            </div>
+            <div class="rounded-md bg-surface-100 px-3 py-2">
+              <p class="text-caption">Duracion</p>
+              <p class="font-medium text-surface-900">{{ seedDurationMsLabel }}</p>
+            </div>
+            <div class="rounded-md bg-surface-100 px-3 py-2">
+              <p class="text-caption">Tablas truncadas</p>
+              <p class="font-medium text-surface-900">{{ seedTablesTruncatedLabel }}</p>
+            </div>
+          </div>
+
+          <div v-if="seedTruncatedTables.length" class="space-y-2">
+            <p class="text-sm font-medium text-surface-800">Listado de tablas truncadas</p>
+            <div class="flex flex-wrap gap-2">
+              <UiBadge
+                v-for="tableName in seedTruncatedTables"
+                :key="tableName"
+                color="neutral"
+              >
+                {{ tableName }}
+              </UiBadge>
+            </div>
+          </div>
+
+          <details>
+            <summary class="text-xs text-surface-600 cursor-pointer">Ver JSON completo</summary>
+            <pre class="mt-2 rounded-lg bg-surface-900 text-surface-0 p-3 text-xs whitespace-pre-wrap overflow-auto">{{ seedActionResultPretty }}</pre>
+          </details>
+        </div>
       </div>
 
       <template #footer>
@@ -379,16 +517,20 @@ onMounted(loadSessions)
     </UiCard>
 
     <UiModal :show="confirmModalOpen" title="Confirmar accion destructiva" @close="closeConfirmModal">
-      <div class="space-y-3 text-sm">
-        <p class="text-[--color-surface-800]">
-          Estás por ejecutar: <strong>{{ getActionLabel(pendingDestructiveAction) }}</strong>
-        </p>
+      <div class="space-y-3 text-sm rounded-lg border p-3" :class="confirmModalPanelClass">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-surface-800">
+            Estás por ejecutar: <strong>{{ getActionLabel(pendingDestructiveAction) }}</strong>
+          </p>
+          <UiBadge :color="confirmModalBadgeColor" dot>{{ getActionLabel(pendingDestructiveAction) }}</UiBadge>
+        </div>
         <p class="text-muted">
           Para continuar, escribí <span class="font-mono">{{ confirmKeyword }}</span>.
         </p>
         <UiInput
           v-model="confirmInput"
           label="Confirmación"
+          size="lg"
           :placeholder="confirmKeyword"
         />
       </div>

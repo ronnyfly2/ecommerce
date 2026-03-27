@@ -17,6 +17,7 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
 import UiSortHeader from '@/components/ui/UiSortHeader.vue'
+import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { getSystemCurrencyCode } from '@/utils/system-currency'
 
 const router = useRouter()
@@ -148,24 +149,30 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center gap-3">
-      <UiSelect
-        v-model="filters.status"
-        :options="statusOptions"
-        class="min-w-55"
-      />
-      <UiSelect
-        v-model="filters.currencyCode"
-        :options="[
-          { value: '', label: 'Todas las monedas' },
-          ...currencies.map((currency) => ({
-            value: currency.code,
-            label: `${currency.code} (${currency.symbol})`,
-          })),
-        ]"
-        class="min-w-55"
-      />
-    </div>
+    <ListViewToolbar>
+      <template #filters>
+        <UiSelect
+          v-model="filters.status"
+          label="Filtrar por estado"
+          size="sm"
+          :options="statusOptions"
+          class="min-w-55"
+        />
+        <UiSelect
+          v-model="filters.currencyCode"
+          label="Filtrar por moneda"
+          size="sm"
+          :options="[
+            { value: '', label: 'Todas las monedas' },
+            ...currencies.map((currency) => ({
+              value: currency.code,
+              label: `${currency.code} (${currency.symbol})`,
+            })),
+          ]"
+          class="min-w-55"
+        />
+      </template>
+    </ListViewToolbar>
 
     <UiCard :padding="false">
       <UiTable :data="displayedOrders" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando órdenes..." empty-message="No hay órdenes">
@@ -196,7 +203,7 @@ onMounted(async () => {
         </template>
 
         <tr v-for="o in displayedOrders" :key="o.id" class="table-tr-hover">
-          <td class="table-td font-mono text-xs text-[--color-surface-500]">#{{ o.id.slice(0, 8) }}</td>
+          <td class="table-td font-mono text-xs text-surface-500">#{{ o.id.slice(0, 8) }}</td>
           <td class="table-td">{{ o.user.email }}</td>
           <td class="table-td">
             <UiBadge :color="statusColor[o.status]" dot>{{ statusLabel[o.status] }}</UiBadge>
@@ -216,7 +223,7 @@ onMounted(async () => {
         </template>
       </UiTable>
 
-      <div class="p-4 border-t border-[--color-surface-200]">
+      <div class="p-4 border-t border-surface-200">
         <UiPagination
           :page="pg.page.value"
           :total-pages="pg.totalPages.value"

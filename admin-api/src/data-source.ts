@@ -19,7 +19,10 @@ import { Tag } from './tags/entities/tag.entity';
 import { Currency } from './currencies/entities/currency.entity';
 import { Notification } from './notifications/entities/notification.entity';
 import { MeasurementUnit } from './measurement-units/entities/measurement-unit.entity';
+import { ChatGroupMember } from './chat/entities/chat-group-member.entity';
+import { ChatGroup } from './chat/entities/chat-group.entity';
 import { ChatMessage } from './chat/entities/chat-message.entity';
+import { ProductReview } from './reviews/entities/product-review.entity';
 
 dotenv.config({ path: '.env' });
 
@@ -50,7 +53,10 @@ export const AppDataSource = new DataSource({
     Currency,
     Notification,
     MeasurementUnit,
+    ChatGroup,
+    ChatGroupMember,
     ChatMessage,
+    ProductReview,
   ],
   migrations: ['src/migration/*.ts'],
   logging: false,

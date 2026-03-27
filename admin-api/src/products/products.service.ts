@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Category } from '../categories/entities/category.entity';
+import {
+  Category,
+  CategoryAttributeDefinition,
+} from '../categories/entities/category.entity';
 import { Color } from '../colors/entities/color.entity';
 import { Coupon } from '../coupons/entities/coupon.entity';
 import { CurrenciesService } from '../currencies/currencies.service';
@@ -24,7 +27,7 @@ import {
   ProductRecommendationType,
 } from './entities/product-recommendation.entity';
 import { ProductVariant } from './entities/product-variant.entity';
-import { Product } from './entities/product.entity';
+import { Product, ProductAttributeValue } from './entities/product.entity';
 
 @Injectable()
 export class ProductsService {
@@ -80,6 +83,16 @@ export class ProductsService {
       description: dto.description ?? null,
       basePrice: dto.basePrice.toFixed(2),
       currencyCode,
+      stock: dto.stock ?? 0,
+      weightValue: dto.weightValue !== undefined ? dto.weightValue.toFixed(3) : null,
+      weightUnit: dto.weightValue !== undefined ? dto.weightUnit?.trim().toLowerCase() || 'kg' : null,
+      lengthValue: dto.lengthValue !== undefined ? dto.lengthValue.toFixed(2) : null,
+      widthValue: dto.widthValue !== undefined ? dto.widthValue.toFixed(2) : null,
+      heightValue: dto.heightValue !== undefined ? dto.heightValue.toFixed(2) : null,
+      dimensionUnit:
+        dto.lengthValue !== undefined || dto.widthValue !== undefined || dto.heightValue !== undefined
+          ? dto.dimensionUnit?.trim().toLowerCase() || 'cm'
+          : null,
       category,
       coupon,
       couponLink: dto.couponLink?.trim() || null,
@@ -88,6 +101,7 @@ export class ProductsService {
       hasOffer: offer.hasOffer,
       offerPrice: offer.offerPrice,
       offerPercentage: offer.offerPercentage,
+      attributeValues: this.normalizeProductAttributeValues(category, dto.attributeValues),
       tags,
     });
 
@@ -96,6 +110,7 @@ export class ProductsService {
     await this.syncRecommendations(savedProduct.id, {
       relatedProductIds: dto.relatedProductIds,
       suggestedProductIds: dto.suggestedProductIds,
+      variantProductIds: dto.variantProductIds,
     });
 
     return this.findOne(savedProduct.id);
@@ -115,6 +130,9 @@ export class ProductsService {
       .leftJoinAndSelect('product.images', 'image')
       .leftJoinAndSelect('product.coupon', 'coupon')
       .leftJoinAndSelect('product.tags', 'tag')
+      .leftJoinAndSelect('product.recommendations', 'recommendation')
+      .leftJoinAndSelect('recommendation.recommendedProduct', 'recommendedProduct')
+      .leftJoinAndSelect('recommendedProduct.images', 'recommendedProductImage')
       .orderBy('product.createdAt', 'DESC')
       .skip(skip)
       .take(limit)
@@ -153,9 +171,10 @@ export class ProductsService {
     }
 
     const [items, total] = await qb.getManyAndCount();
+    const mappedItems = items.map((item) => this.mapProductRecommendations(item));
 
     return {
-      items,
+      items: mappedItems,
       meta: {
         total,
         page,
@@ -204,6 +223,7 @@ export class ProductsService {
       },
       relatedProducts: product.relatedProducts ?? [],
       suggestedProducts: product.suggestedProducts ?? [],
+      variantProducts: product.variantProducts ?? [],
     };
   }
 
@@ -245,6 +265,43 @@ export class ProductsService {
       product.currencyCode = await this.resolveCurrencyCode(dto.currencyCode);
     }
 
+    if (dto.stock !== undefined) {
+      product.stock = dto.stock;
+    }
+
+    if (dto.weightValue !== undefined) {
+      product.weightValue = dto.weightValue.toFixed(3);
+      product.weightUnit = dto.weightUnit?.trim().toLowerCase() || product.weightUnit || 'kg';
+    }
+
+    if (dto.weightValue === undefined && dto.weightUnit !== undefined && product.weightValue) {
+      product.weightUnit = dto.weightUnit.trim().toLowerCase();
+    }
+
+    if (dto.lengthValue !== undefined) {
+      product.lengthValue = dto.lengthValue.toFixed(2);
+    }
+
+    if (dto.widthValue !== undefined) {
+      product.widthValue = dto.widthValue.toFixed(2);
+    }
+
+    if (dto.heightValue !== undefined) {
+      product.heightValue = dto.heightValue.toFixed(2);
+    }
+
+    if (dto.dimensionUnit !== undefined) {
+      product.dimensionUnit = dto.dimensionUnit.trim().toLowerCase();
+    }
+
+    if (
+      dto.lengthValue !== undefined ||
+      dto.widthValue !== undefined ||
+      dto.heightValue !== undefined
+    ) {
+      product.dimensionUnit = product.dimensionUnit || dto.dimensionUnit?.trim().toLowerCase() || 'cm';
+    }
+
     if (dto.isActive !== undefined) {
       product.isActive = dto.isActive;
     }
@@ -263,6 +320,10 @@ export class ProductsService {
 
     if (dto.couponLink !== undefined) {
       product.couponLink = dto.couponLink?.trim() || null;
+    }
+
+    if (dto.attributeValues !== undefined) {
+      product.attributeValues = this.normalizeProductAttributeValues(product.category, dto.attributeValues);
     }
 
     const nextBasePrice = dto.basePrice !== undefined
@@ -289,6 +350,11 @@ export class ProductsService {
       await this.syncRecommendations(id, {
         relatedProductIds: dto.relatedProductIds,
         suggestedProductIds: dto.suggestedProductIds,
+        variantProductIds: dto.variantProductIds,
+      });
+    } else if (dto.variantProductIds !== undefined) {
+      await this.syncRecommendations(id, {
+        variantProductIds: dto.variantProductIds,
       });
     }
 
@@ -509,7 +575,7 @@ export class ProductsService {
   private async resolveRecommendationProducts(
     recommendationIds: string[] | undefined,
     currentProductId: string,
-    label: 'related' | 'suggested',
+    label: 'related' | 'suggested' | 'variant',
   ) {
     if (!recommendationIds || recommendationIds.length === 0) {
       return [];
@@ -534,7 +600,7 @@ export class ProductsService {
 
   private async syncRecommendations(
     productId: string,
-    input: { relatedProductIds?: string[]; suggestedProductIds?: string[] },
+    input: { relatedProductIds?: string[]; suggestedProductIds?: string[]; variantProductIds?: string[] },
   ) {
     const existing = await this.recommendationsRepository.find({
       where: { product: { id: productId } },
@@ -552,6 +618,13 @@ export class ProductsService {
       ? await this.resolveRecommendationProducts(input.suggestedProductIds, productId, 'suggested')
       : existing
           .filter((item) => item.type === ProductRecommendationType.SUGGESTED)
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((item) => item.recommendedProduct.id);
+
+    const nextVariantIds = input.variantProductIds !== undefined
+      ? await this.resolveRecommendationProducts(input.variantProductIds, productId, 'variant')
+      : existing
+          .filter((item) => item.type === ProductRecommendationType.VARIANT)
           .sort((a, b) => a.displayOrder - b.displayOrder)
           .map((item) => item.recommendedProduct.id);
 
@@ -579,6 +652,14 @@ export class ProductsService {
           displayOrder: index,
         }),
       ),
+      ...nextVariantIds.map((recommendedProductId, index) =>
+        this.recommendationsRepository.create({
+          product: { id: productId } as Product,
+          recommendedProduct: { id: recommendedProductId } as Product,
+          type: ProductRecommendationType.VARIANT,
+          displayOrder: index,
+        }),
+      ),
     ];
 
     if (rows.length > 0) {
@@ -596,11 +677,16 @@ export class ProductsService {
       .filter((item) => item.type === ProductRecommendationType.SUGGESTED)
       .sort((a, b) => a.displayOrder - b.displayOrder)
       .map((item) => item.recommendedProduct);
+    const variantProducts = recommendations
+      .filter((item) => item.type === ProductRecommendationType.VARIANT)
+      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .map((item) => item.recommendedProduct);
 
     return {
       ...product,
       relatedProducts,
       suggestedProducts,
+      variantProducts,
     };
   }
 
@@ -707,6 +793,98 @@ export class ProductsService {
       offerPrice: finalOfferPrice.toFixed(2),
       offerPercentage: finalOfferPercentage.toFixed(2),
     };
+  }
+
+  private normalizeProductAttributeValues(
+    category: Category,
+    input?: Array<{ key: string; value?: string | number | boolean | null }>,
+  ): ProductAttributeValue[] {
+    const definitions = (category.attributeDefinitions ?? [])
+      .filter((definition) => definition.isActive !== false)
+      .sort((left, right) => left.displayOrder - right.displayOrder);
+
+    if (definitions.length === 0) {
+      if (input && input.length > 0) {
+        throw new ConflictException('Selected category does not define dynamic attributes');
+      }
+      return [];
+    }
+
+    const rawValues = new Map((input ?? []).map((item) => [item.key, item.value]));
+    const unknownKeys = [...rawValues.keys()].filter(
+      (key) => !definitions.some((definition) => definition.key === key),
+    );
+
+    if (unknownKeys.length > 0) {
+      throw new ConflictException(`Unknown product attributes: ${unknownKeys.join(', ')}`);
+    }
+
+    const normalized: ProductAttributeValue[] = [];
+
+    for (const definition of definitions) {
+      const normalizedValue = this.normalizeProductAttributeValue(definition, rawValues.get(definition.key));
+
+      if (normalizedValue === null || normalizedValue === undefined || normalizedValue === '') {
+        if (definition.required) {
+          throw new ConflictException(`Attribute "${definition.label}" is required`);
+        }
+        continue;
+      }
+
+      normalized.push({
+        key: definition.key,
+        label: definition.label,
+        type: definition.type,
+        unit: definition.unit ?? null,
+        value: normalizedValue,
+      });
+    }
+
+    return normalized;
+  }
+
+  private normalizeProductAttributeValue(
+    definition: CategoryAttributeDefinition,
+    rawValue: string | number | boolean | null | undefined,
+  ) {
+    if (rawValue === null || rawValue === undefined || rawValue === '') {
+      return null;
+    }
+
+    if (definition.type === 'boolean') {
+      if (typeof rawValue === 'boolean') {
+        return rawValue;
+      }
+
+      if (rawValue === 'true') {
+        return true;
+      }
+
+      if (rawValue === 'false') {
+        return false;
+      }
+
+      throw new ConflictException(`Attribute "${definition.label}" expects a boolean value`);
+    }
+
+    if (definition.type === 'number') {
+      const numeric = Number(rawValue);
+      if (!Number.isFinite(numeric)) {
+        throw new ConflictException(`Attribute "${definition.label}" expects a numeric value`);
+      }
+      return numeric;
+    }
+
+    const stringValue = String(rawValue).trim();
+    if (!stringValue) {
+      return null;
+    }
+
+    if (definition.type === 'select' && !definition.options.includes(stringValue)) {
+      throw new ConflictException(`Attribute "${definition.label}" has an invalid option`);
+    }
+
+    return stringValue;
   }
 
   private async generateUniqueSlug(name: string, ignoreId?: string): Promise<string> {

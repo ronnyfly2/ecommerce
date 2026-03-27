@@ -15,14 +15,14 @@ defineProps<{
         :class="[
           'w-12 h-12 rounded-xl flex items-center justify-center shrink-0',
           tone === 'success'
-            ? 'bg-[--color-success-100] text-[--color-success-600]'
+            ? 'bg-success-100 text-success-700'
             : tone === 'warning'
-              ? 'bg-[--color-warning-100] text-[--color-warning-600]'
+              ? 'bg-warning-100 text-warning-800'
               : tone === 'info'
-                ? 'bg-[--color-info-100] text-[--color-info-600]'
+                ? 'bg-info-100 text-info-700'
                 : tone === 'neutral'
-                  ? 'bg-[--color-surface-100] text-[--color-surface-600]'
-                  : 'bg-[--color-primary-100] text-[--color-primary-600]',
+                  ? 'bg-surface-100 text-surface-600'
+                  : 'bg-primary-100 text-primary-700',
         ]"
       >
         <slot name="icon" />
@@ -30,7 +30,7 @@ defineProps<{
 
       <div class="min-w-0">
         <p class="text-caption uppercase tracking-wide">{{ title }}</p>
-        <p class="text-[1.75rem] leading-tight font-bold text-[--color-surface-900] mt-1 truncate">
+        <p class="text-[1.75rem] leading-tight font-bold text-surface-900 mt-1 truncate">
           {{ value }}
         </p>
       </div>

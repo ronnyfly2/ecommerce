@@ -12,6 +12,7 @@ import { Product } from './product.entity';
 export enum ProductRecommendationType {
   RELATED = 'RELATED',
   SUGGESTED = 'SUGGESTED',
+  VARIANT = 'VARIANT',
 }
 
 @Entity('product_recommendations')
