@@ -74,6 +74,16 @@ export class ReviewsController {
   }
 
   @Roles(Role.CUSTOMER, ...BACKOFFICE_ROLES)
+  @Get('me')
+  @ApiOperation({ summary: 'Obtener mi review para un producto' })
+  findMyReview(
+    @Param('productId') productId: string,
+    @GetUser('id') userId: string,
+  ) {
+    return this.reviewsService.findOwnReview(productId, userId);
+  }
+
+  @Roles(Role.CUSTOMER, ...BACKOFFICE_ROLES)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.reviewsService.findOne(id);

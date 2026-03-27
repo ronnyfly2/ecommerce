@@ -81,6 +81,8 @@ export class ProductsService {
       sku: normalizedSku,
       slug,
       description: dto.description ?? null,
+      graphicDescription: dto.graphicDescription?.trim() || null,
+      usageMode: dto.usageMode?.trim() || null,
       basePrice: dto.basePrice.toFixed(2),
       currencyCode,
       stock: dto.stock ?? 0,
@@ -255,6 +257,14 @@ export class ProductsService {
 
     if (dto.description !== undefined) {
       product.description = dto.description ?? null;
+    }
+
+    if (dto.graphicDescription !== undefined) {
+      product.graphicDescription = dto.graphicDescription?.trim() || null;
+    }
+
+    if (dto.usageMode !== undefined) {
+      product.usageMode = dto.usageMode?.trim() || null;
     }
 
     if (dto.basePrice !== undefined) {

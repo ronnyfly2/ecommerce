@@ -105,6 +105,19 @@ export class ReviewsService {
     return this.mapReview(review);
   }
 
+  async findOwnReview(productId: string, userId: string) {
+    const review = await this.reviewsRepository.findOne({
+      where: { product: { id: productId }, user: { id: userId } },
+      relations: { user: true },
+    });
+
+    if (!review) {
+      return null;
+    }
+
+    return this.mapReview(review);
+  }
+
   async update(
     id: string,
     dto: UpdateReviewDto,

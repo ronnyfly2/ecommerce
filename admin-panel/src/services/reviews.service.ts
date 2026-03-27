@@ -41,6 +41,13 @@ export const reviewsService = {
     return res.data.data
   },
 
+  async getMine(productId: string) {
+    const res = await http.get<ApiResponse<ProductReview | null>>(
+      `/products/${productId}/reviews/me`,
+    )
+    return res.data.data
+  },
+
   async update(productId: string, id: string, dto: UpdateReviewDto) {
     const res = await http.patch<ApiResponse<ProductReview>>(`/products/${productId}/reviews/${id}`, dto)
     return res.data.data

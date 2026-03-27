@@ -42,6 +42,12 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
+  @Column({ name: 'graphic_description', type: 'text', nullable: true })
+  graphicDescription: string | null;
+
+  @Column({ name: 'usage_mode', type: 'text', nullable: true })
+  usageMode: string | null;
+
   @Column({ name: 'base_price', type: 'decimal', precision: 12, scale: 2 })
   basePrice: string;
 

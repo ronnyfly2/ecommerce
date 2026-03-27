@@ -394,6 +394,8 @@ export interface Product {
   sku: string
   slug: string
   description: string | null
+  graphicDescription: string | null
+  usageMode: string | null
   basePrice: string
   currencyCode: string
   stock: number
@@ -426,6 +428,8 @@ export interface CreateProductDto {
   name: string
   sku: string
   description?: string
+  graphicDescription?: string
+  usageMode?: string
   basePrice: number
   currencyCode?: string
   stock?: number

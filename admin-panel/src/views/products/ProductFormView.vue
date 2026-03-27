@@ -26,6 +26,7 @@ import UiCard from '@/components/ui/UiCard.vue'
 import UiFileInput from '@/components/ui/UiFileInput.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
+import UiTextarea from '@/components/ui/UiTextarea.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiModal from '@/components/ui/UiModal.vue'
@@ -64,6 +65,8 @@ const form = reactive({
   name: '',
   sku: '',
   description: '',
+  graphicDescription: '',
+  usageMode: '',
   basePrice: 0,
   currencyCode: getSystemCurrencyCode(),
   stock: 0,
@@ -236,6 +239,8 @@ const filteredRelatedProducts = computed(() => filterRecommendationProducts(rela
 const filteredSuggestedProducts = computed(() => filterRecommendationProducts(suggestedProductSearch.value, 'suggested'))
 const filteredVariantProducts = computed(() => filterRecommendationProducts(variantProductSearch.value, 'variant'))
 const descriptionLength = computed(() => form.description.trim().length)
+const graphicDescriptionLength = computed(() => form.graphicDescription.trim().length)
+const usageModeLength = computed(() => form.usageMode.trim().length)
 const slugPreview = computed(() => slugify(form.name))
 const productSkuPreview = computed(() => normalizeSku(form.sku || form.name))
 const initialVariantSkuPreview = computed(() =>
@@ -374,6 +379,8 @@ async function loadProduct() {
     form.name = p.name
     form.sku = p.sku
     form.description = p.description ?? ''
+    form.graphicDescription = p.graphicDescription ?? ''
+    form.usageMode = p.usageMode ?? ''
     form.basePrice = Number(p.basePrice)
     form.currencyCode = p.currencyCode || getSystemCurrencyCode()
     form.stock = Number(p.stock ?? 0)
@@ -483,6 +490,8 @@ async function save() {
       name: form.name,
       sku: normalizeSku(form.sku),
       description: form.description || undefined,
+      graphicDescription: form.graphicDescription.trim() || undefined,
+      usageMode: form.usageMode.trim() || undefined,
       basePrice: Number(form.basePrice),
       currencyCode: form.currencyCode,
       stock: Number(form.stock),
@@ -729,6 +738,8 @@ async function createIndependentVariantProducts(parentProductId: string) {
         name: variantName,
         sku: normalizeSku(variant.sku),
         description: form.description || undefined,
+        graphicDescription: form.graphicDescription.trim() || undefined,
+        usageMode: form.usageMode.trim() || undefined,
         basePrice: variantBasePrice,
         currencyCode: form.currencyCode,
         categoryId: form.categoryId,
@@ -1774,6 +1785,29 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
                   </div>
                   <p class="text-xs text-surface-500">{{ descriptionLength }} caracteres</p>
                 </div>
+              </div>
+
+              <div class="lg:col-span-2 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <UiTextarea
+                  v-model="form.graphicDescription"
+                  size="lg"
+                  :rows="4"
+                  label="Graphic Description"
+                  placeholder="Describe visual style, silhouette, textures, and key visual cues."
+                />
+                <UiTextarea
+                  v-model="form.usageMode"
+                  size="lg"
+                  :rows="4"
+                  label="Usage Mode"
+                  placeholder="Explain how to use or wear the product in practical scenarios."
+                />
+                <p class="text-xs text-surface-500">
+                  Graphic Description: {{ graphicDescriptionLength }} chars
+                </p>
+                <p class="text-xs text-surface-500">
+                  Usage Mode: {{ usageModeLength }} chars
+                </p>
               </div>
 
               <div class="lg:col-span-2 space-y-2">

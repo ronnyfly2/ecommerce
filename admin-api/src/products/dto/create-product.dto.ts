@@ -42,6 +42,16 @@ export class CreateProductDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({ example: 'Clean silhouette with contrast seam lines and oversized fit.' })
+  @IsOptional()
+  @IsString()
+  graphicDescription?: string;
+
+  @ApiPropertyOptional({ example: 'Wear with neutral bottoms and wash at low temperature.' })
+  @IsOptional()
+  @IsString()
+  usageMode?: string;
+
   @ApiProperty({ example: 29.99 })
   @IsNumber()
   @Min(0)

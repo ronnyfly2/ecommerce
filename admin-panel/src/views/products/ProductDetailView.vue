@@ -12,6 +12,7 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiFileInput from '@/components/ui/UiFileInput.vue'
 import UiInput from '@/components/ui/UiInput.vue'
+import UiTextarea from '@/components/ui/UiTextarea.vue'
 import UiTable from '@/components/ui/UiTable.vue'
 import UiEmptyState from '@/components/ui/UiEmptyState.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
@@ -34,18 +35,83 @@ const reviewsMeta = ref({ page: 1, limit: 10, total: 0, totalPages: 0 })
 const reviewsPage = ref(1)
 const reviewActionLoading = ref<string | null>(null)
 const canApproveReviews = computed(() => auth.isAdmin)
+const canReviewProduct = computed(() => auth.isAuthenticated)
+const myReview = ref<ProductReview | null>(null)
+const reviewForm = reactive({
+  rating: 5,
+  comment: '',
+  loading: false,
+  editing: false,
+})
+
+function resetReviewForm() {
+  reviewForm.rating = 5
+  reviewForm.comment = ''
+  reviewForm.editing = false
+}
+
+function startEditMyReview() {
+  if (!myReview.value) return
+  reviewForm.rating = myReview.value.rating
+  reviewForm.comment = myReview.value.comment ?? ''
+  reviewForm.editing = true
+}
+
+async function submitMyReview() {
+  if (!product.value || !canReviewProduct.value) return
+
+  reviewForm.loading = true
+  try {
+    if (myReview.value) {
+      await reviewsService.update(product.value.id, myReview.value.id, {
+        rating: reviewForm.rating,
+        comment: reviewForm.comment.trim() || undefined,
+      })
+      toast.success('Reseña actualizada')
+    } else {
+      await reviewsService.create(product.value.id, {
+        rating: reviewForm.rating,
+        comment: reviewForm.comment.trim() || undefined,
+      })
+      toast.success('Reseña enviada. Quedó pendiente de aprobación.')
+    }
+
+    resetReviewForm()
+    await loadReviews()
+  } catch (e) {
+    toast.error('Error', extractErrorMessage(e, 'No se pudo guardar tu reseña'))
+  } finally {
+    reviewForm.loading = false
+  }
+}
 
 async function loadReviews() {
   if (!product.value) return
   reviewsLoading.value = true
   try {
-    const [data, stats] = await Promise.all([
-      reviewsService.listAllByProduct(product.value.id, { page: reviewsPage.value, limit: 10 }),
+    const reviewsRequest = canApproveReviews.value
+      ? reviewsService.listAllByProduct(product.value.id, { page: reviewsPage.value, limit: 10 })
+      : reviewsService.listByProduct(product.value.id, { page: reviewsPage.value, limit: 10 })
+
+    const myReviewRequest = canReviewProduct.value
+      ? reviewsService.getMine(product.value.id)
+      : Promise.resolve(null)
+
+    const [data, stats, mine] = await Promise.all([
+      reviewsRequest,
       reviewsService.stats(product.value.id),
+      myReviewRequest,
     ])
+
     reviews.value = data.items
     reviewsMeta.value = data.meta
     reviewStats.value = stats
+    myReview.value = mine
+
+    if (!reviewForm.editing && myReview.value) {
+      reviewForm.rating = myReview.value.rating
+      reviewForm.comment = myReview.value.comment ?? ''
+    }
   } catch {
     toast.error('Error', 'No se pudieron cargar las reviews')
   } finally {
@@ -292,6 +358,14 @@ const suggestedForDisplay = computed(() => {
             <p class="text-caption mb-1">Descripción</p>
             <div class="text-body prose prose-sm max-w-none" v-html="product.description" />
           </div>
+          <div v-if="product.graphicDescription" class="mt-4">
+            <p class="text-caption mb-1">Graphic Description</p>
+            <p class="text-body whitespace-pre-line">{{ product.graphicDescription }}</p>
+          </div>
+          <div v-if="product.usageMode" class="mt-4">
+            <p class="text-caption mb-1">Usage Mode</p>
+            <p class="text-body whitespace-pre-line">{{ product.usageMode }}</p>
+          </div>
         </UiCard>
 
         <UiCard>
@@ -438,6 +512,63 @@ const suggestedForDisplay = computed(() => {
                 <span class="text-yellow-500">★</span>
                 <span class="font-medium text-sm">{{ reviewStats.average }}</span>
               </div>
+            </div>
+          </div>
+
+          <div v-if="canReviewProduct" class="mb-4 rounded-xl border border-surface-200 p-4 bg-surface-50 space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-surface-900">
+                {{ myReview ? 'Tu reseña' : 'Escribe tu reseña' }}
+              </p>
+              <UiBadge v-if="myReview" :color="myReview.isApproved ? 'success' : 'warning'" dot>
+                {{ myReview.isApproved ? 'Aprobada' : 'Pendiente' }}
+              </UiBadge>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-muted">Calificación:</span>
+              <div class="flex gap-1">
+                <button
+                  v-for="star in [1, 2, 3, 4, 5]"
+                  :key="`star-${star}`"
+                  type="button"
+                  class="text-lg leading-none"
+                  :class="star <= reviewForm.rating ? 'text-yellow-500' : 'text-surface-300'"
+                  @click="reviewForm.rating = star"
+                >
+                  ★
+                </button>
+              </div>
+            </div>
+
+            <UiTextarea
+              v-model="reviewForm.comment"
+              size="lg"
+              :rows="3"
+              label="Comentario"
+              placeholder="Comparte tu experiencia con este producto"
+            />
+
+            <div class="flex items-center gap-2">
+              <UiButton :loading="reviewForm.loading" @click="submitMyReview">
+                {{ myReview ? 'Actualizar reseña' : 'Enviar reseña' }}
+              </UiButton>
+              <UiButton
+                v-if="myReview"
+                variant="secondary"
+                :disabled="reviewForm.loading"
+                @click="startEditMyReview"
+              >
+                Restaurar valores
+              </UiButton>
+              <UiButton
+                v-if="myReview"
+                variant="ghost"
+                :disabled="reviewForm.loading"
+                @click="resetReviewForm"
+              >
+                Limpiar
+              </UiButton>
             </div>
           </div>
 
