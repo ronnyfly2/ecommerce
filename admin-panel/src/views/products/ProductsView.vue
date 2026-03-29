@@ -98,21 +98,19 @@ async function load() {
     products.value = result.items
     pg.total.value = result.total
 
-    const stockResults = await Promise.allSettled(
-      result.items.map(async (item) => {
-        const stock = await inventoryService.getProductStock(item.id)
-        return [item.id, stock] as const
-      }),
-    )
+    if (result.items.length) {
+      try {
+        const stocks = await inventoryService.productStocksByProducts({
+          productIds: result.items.map((item) => item.id),
+        })
 
-    const stockMap: Record<string, ProductStockOverview> = {}
-    for (const entry of stockResults) {
-      if (entry.status === 'fulfilled') {
-        const [productId, stock] = entry.value
-        stockMap[productId] = stock
+        stockByProductId.value = Object.fromEntries(
+          stocks.map((stock) => [stock.productId, stock]),
+        )
+      } catch {
+        stockByProductId.value = {}
       }
     }
-    stockByProductId.value = stockMap
   } catch {
     products.value = []
     toast.error('Error', 'No se pudo cargar los productos')

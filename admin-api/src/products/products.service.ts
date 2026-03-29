@@ -124,66 +124,104 @@ export class ProductsService {
     const limit = Math.min(query.limit ?? 10, 100);
     const skip = (page - 1) * limit;
 
-    const qb = this.productsRepository
-      .createQueryBuilder('product')
-      .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.variants', 'variant')
-      .leftJoinAndSelect('variant.size', 'size')
-      .leftJoinAndSelect('variant.color', 'color')
-      .leftJoinAndSelect('product.images', 'image')
-      .leftJoinAndSelect('product.coupon', 'coupon')
-      .leftJoinAndSelect('product.tags', 'tag')
-      .leftJoinAndSelect('product.recommendations', 'recommendation')
-      .leftJoinAndSelect('recommendation.recommendedProduct', 'recommendedProduct')
-      .leftJoinAndSelect('recommendedProduct.images', 'recommendedProductImage')
-      .orderBy('product.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit)
-      .distinct(true);
+    // Step 1: Lean query for correct count + paginated IDs.
+    // Only join the tags table when filtering by tag (many-to-many).
+    // Category and coupon FKs live on the products table itself — no join needed.
+    const baseQb = this.productsRepository.createQueryBuilder('product');
 
+    if (query.tagId) {
+      baseQb
+        .leftJoin('product.tags', 'tag')
+        .andWhere('tag.id = :tagId', { tagId: query.tagId });
+    }
     if (query.search) {
-      qb.andWhere('(product.name ILIKE :search OR product.sku ILIKE :search)', {
+      baseQb.andWhere('(product.name ILIKE :search OR product.sku ILIKE :search)', {
         search: `%${query.search}%`,
       });
     }
-
     if (query.categoryId) {
-      qb.andWhere('product.category_id = :categoryId', { categoryId: query.categoryId });
+      baseQb.andWhere('product.category_id = :categoryId', { categoryId: query.categoryId });
     }
-
-    if (query.tagId) {
-      qb.andWhere('tag.id = :tagId', { tagId: query.tagId });
-    }
-
     if (query.isActive !== undefined) {
-      qb.andWhere('product.is_active = :isActive', { isActive: query.isActive });
+      baseQb.andWhere('product.is_active = :isActive', { isActive: query.isActive });
     }
-
     if (query.hasOffer !== undefined) {
-      qb.andWhere('product.has_offer = :hasOffer', { hasOffer: query.hasOffer });
+      baseQb.andWhere('product.has_offer = :hasOffer', { hasOffer: query.hasOffer });
     }
-
     if (query.couponId) {
-      qb.andWhere('coupon.id = :couponId', { couponId: query.couponId });
+      baseQb.andWhere('product.coupon_id = :couponId', { couponId: query.couponId });
     }
-
     if (query.currencyCode) {
-      qb.andWhere('product.currency_code = :currencyCode', {
+      baseQb.andWhere('product.currency_code = :currencyCode', {
         currencyCode: this.normalizeCurrencyCode(query.currencyCode),
       });
     }
 
-    const [items, total] = await qb.getManyAndCount();
-    const mappedItems = items.map((item) => this.mapProductRecommendations(item));
+    const total = await baseQb.clone().getCount();
+
+    if (total === 0) {
+      return { items: [], meta: { total: 0, page, limit, totalPages: 0 } };
+    }
+
+    const pageItems = await baseQb
+      .clone()
+      .select(['product.id'])
+      .orderBy('product.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getMany();
+
+    const ids = pageItems.map((p) => p.id);
+
+    if (ids.length === 0) {
+      return { items: [], meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    }
+
+    // Step 2: Load only the relations the list view actually needs.
+    // Variants and full recommendation data are not displayed in the list.
+    const products = await this.productsRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.images', 'image')
+      .whereInIds(ids)
+      .orderBy('product.createdAt', 'DESC')
+      .getMany();
+
+    // Step 3: Fetch VARIANT recommendation stubs (UI only uses .length for version count).
+    // No nested product data or images are loaded.
+    const variantRecs = await this.recommendationsRepository
+      .createQueryBuilder('rec')
+      .innerJoin('rec.product', 'prod')
+      .innerJoin('rec.recommendedProduct', 'rp')
+      .select(['rec.id', 'rec.displayOrder', 'prod.id', 'rp.id'])
+      .where('prod.id IN (:...ids)', { ids })
+      .andWhere('rec.type = :type', { type: ProductRecommendationType.VARIANT })
+      .orderBy('rec.displayOrder', 'ASC')
+      .getMany();
+
+    const variantsByProduct = new Map<string, Product[]>();
+    for (const rec of variantRecs) {
+      const pid = rec.product.id;
+      const list = variantsByProduct.get(pid) ?? [];
+      list.push(rec.recommendedProduct);
+      variantsByProduct.set(pid, list);
+    }
+
+    // Restore pagination order — IN clause does not guarantee row order.
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    const items = ids
+      .map((id) => productMap.get(id))
+      .filter((p): p is Product => p !== undefined)
+      .map((product) => ({
+        ...product,
+        relatedProducts: [] as Product[],
+        suggestedProducts: [] as Product[],
+        variantProducts: variantsByProduct.get(product.id) ?? ([] as Product[]),
+      }));
 
     return {
-      items: mappedItems,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      items,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 

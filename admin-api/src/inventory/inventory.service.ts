@@ -183,6 +183,72 @@ export class InventoryService {
     };
   }
 
+  async getProductStocksByProductIds(productIds: string[]) {
+    const uniqueProductIds = Array.from(new Set((productIds ?? []).filter(Boolean))).slice(0, 100);
+    if (!uniqueProductIds.length) {
+      return [];
+    }
+
+    const [products, stores, deliveryStocks, pickupStocks] = await Promise.all([
+      this.productsRepository.find({ where: { id: In(uniqueProductIds) } }),
+      this.storesRepository.find({ where: { isActive: true }, order: { code: 'ASC' } }),
+      this.deliveryStocksRepository.find({
+        where: { product: { id: In(uniqueProductIds) } },
+        relations: { product: true },
+      }),
+      this.storeStocksRepository.find({
+        where: { product: { id: In(uniqueProductIds) } },
+        relations: { store: true, product: true },
+      }),
+    ]);
+
+    const validDeliveryStocks = deliveryStocks.filter((item) => item.product?.id);
+    const droppedDeliveryStocks = deliveryStocks.length - validDeliveryStocks.length;
+    if (droppedDeliveryStocks > 0) {
+      this.logger.warn(
+        `Detected ${droppedDeliveryStocks} orphan delivery stock row(s) while listing batch product stocks`,
+      );
+    }
+
+    const validPickupStocks = pickupStocks.filter((item) => item.product?.id && item.store?.id);
+    const droppedPickupStocks = pickupStocks.length - validPickupStocks.length;
+    if (droppedPickupStocks > 0) {
+      this.logger.warn(
+        `Detected ${droppedPickupStocks} orphan pickup stock row(s) while listing batch product stocks`,
+      );
+    }
+
+    const productsById = new Map(products.map((product) => [product.id, product]));
+    const deliveryByProduct = new Map(validDeliveryStocks.map((item) => [item.product.id, item.stock]));
+    const pickupByProductAndStore = new Map(
+      validPickupStocks.map((item) => [`${item.product.id}:${item.store.id}`, item.stock]),
+    );
+
+    const items = uniqueProductIds
+      .map((productId) => productsById.get(productId))
+      .filter((product): product is Product => Boolean(product))
+      .map((product) => {
+        const deliveryStock = deliveryByProduct.get(product.id) ?? 0;
+        const pickupItems = stores.map((store) => ({
+          storeId: store.id,
+          storeCode: store.code,
+          storeName: store.name,
+          stock: pickupByProductAndStore.get(`${product.id}:${store.id}`) ?? 0,
+        }));
+        const totalStock = deliveryStock + pickupItems.reduce((sum, item) => sum + item.stock, 0);
+
+        return {
+          productId: product.id,
+          sku: product.sku,
+          deliveryStock,
+          pickupStocks: pickupItems,
+          totalStock,
+        };
+      });
+
+    return items;
+  }
+
   async upsertProductStock(productId: string, dto: UpsertProductStockDto, userId: string) {
     if (dto.deliveryStock === undefined && !dto.pickupStocks?.length) {
       throw new BadRequestException('deliveryStock or pickupStocks is required');

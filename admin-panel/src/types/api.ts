@@ -764,6 +764,10 @@ export interface QueryProductStocksDto {
   storeId?: string
 }
 
+export interface BatchQueryProductStocksDto {
+  productIds: string[]
+}
+
 export interface BulkUpsertProductStocksDto {
   items: Array<{
     productId: string

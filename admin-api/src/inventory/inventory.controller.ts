@@ -23,6 +23,7 @@ import { QueryInventoryMovementsDto } from './dto/query-inventory-movements.dto'
 import { UpsertProductStockDto } from './dto/upsert-product-stock.dto';
 import { QueryProductStocksDto } from './dto/query-product-stocks.dto';
 import { BulkUpsertProductStocksDto } from './dto/bulk-upsert-product-stocks.dto';
+import { BatchQueryProductStocksDto } from './dto/batch-query-product-stocks.dto';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { InventoryService } from './inventory.service';
@@ -64,6 +65,12 @@ export class InventoryController {
   @Get('stocks')
   productStocks(@Query() query: QueryProductStocksDto) {
     return this.inventoryService.listProductStocks(query);
+  }
+
+  @Roles(...INVENTORY_READ_ROLES)
+  @Post('stocks/by-products')
+  productStocksByProducts(@Body() dto: BatchQueryProductStocksDto) {
+    return this.inventoryService.getProductStocksByProductIds(dto.productIds);
   }
 
   @Roles(...INVENTORY_MANAGE_ROLES)

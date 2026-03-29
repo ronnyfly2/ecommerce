@@ -9,6 +9,7 @@ import type {
   CreateStoreDto,
   UpdateStoreDto,
   ProductStockOverview,
+  BatchQueryProductStocksDto,
   UpsertProductStockDto,
   ProductStockListItem,
   QueryProductStocksDto,
@@ -62,6 +63,11 @@ export const inventoryService = {
 
   async productStocks(params?: QueryProductStocksDto) {
     const res = await http.get<ApiResponse<ApiListData<ProductStockListItem>>>('/inventory/stocks', { params })
+    return res.data.data
+  },
+
+  async productStocksByProducts(dto: BatchQueryProductStocksDto) {
+    const res = await http.post<ApiResponse<ProductStockOverview[]>>('/inventory/stocks/by-products', dto)
     return res.data.data
   },
 
