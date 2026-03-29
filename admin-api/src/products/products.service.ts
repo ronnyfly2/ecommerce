@@ -27,7 +27,7 @@ import {
   ProductRecommendationType,
 } from './entities/product-recommendation.entity';
 import { ProductVariant } from './entities/product-variant.entity';
-import { Product, ProductAttributeValue } from './entities/product.entity';
+import { Product, ProductAttributeValue, ProductFeature } from './entities/product.entity';
 
 @Injectable()
 export class ProductsService {
@@ -104,6 +104,7 @@ export class ProductsService {
       offerPrice: offer.offerPrice,
       offerPercentage: offer.offerPercentage,
       attributeValues: this.normalizeProductAttributeValues(category, dto.attributeValues),
+      features: this.normalizeProductFeatures(dto.features),
       tags,
     });
 
@@ -334,6 +335,10 @@ export class ProductsService {
 
     if (dto.attributeValues !== undefined) {
       product.attributeValues = this.normalizeProductAttributeValues(product.category, dto.attributeValues);
+    }
+
+    if (dto.features !== undefined) {
+      product.features = this.normalizeProductFeatures(dto.features);
     }
 
     const nextBasePrice = dto.basePrice !== undefined
@@ -851,6 +856,25 @@ export class ProductsService {
     }
 
     return normalized;
+  }
+
+  private normalizeProductFeatures(
+    input?: Array<{ icon: string; name: string }>,
+  ): ProductFeature[] {
+    if (!input) {
+      return [];
+    }
+
+    return input.map((item, index) => {
+      const icon = item.icon?.trim();
+      const name = item.name?.trim();
+
+      if (!icon || !name) {
+        throw new ConflictException(`Feature #${index + 1} requires both icon and name`);
+      }
+
+      return { icon, name };
+    });
   }
 
   private normalizeProductAttributeValue(

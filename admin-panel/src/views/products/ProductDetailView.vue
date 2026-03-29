@@ -260,6 +260,11 @@ function fmt(n: string | number, currencyCode = product.value?.currencyCode || g
   return formatMoney(n, currencyCode)
 }
 
+function isFeatureImage(value: string) {
+  const trimmed = String(value ?? '').trim().toLowerCase()
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/') || trimmed.endsWith('.svg')
+}
+
 
 function recommendationImage(product: Product) {
   const main = product.images?.find((img) => img.isMain)
@@ -365,6 +370,27 @@ const suggestedForDisplay = computed(() => {
           <div v-if="product.usageMode" class="mt-4">
             <p class="text-caption mb-1">Usage Mode</p>
             <p class="text-body whitespace-pre-line">{{ product.usageMode }}</p>
+          </div>
+          <div v-if="product.features?.length" class="mt-4">
+            <p class="text-caption mb-2">Características</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div
+                v-for="(feature, index) in product.features"
+                :key="`feature-${index}`"
+                class="flex items-center gap-3 rounded-xl border border-surface-200 bg-surface-50 px-3 py-2"
+              >
+                <img
+                  v-if="isFeatureImage(feature.icon)"
+                  :src="feature.icon"
+                  :alt="feature.name"
+                  class="h-6 w-6 object-contain"
+                />
+                <span v-else class="text-sm font-semibold text-surface-700">
+                  {{ feature.icon }}
+                </span>
+                <span class="text-sm text-surface-800">{{ feature.name }}</span>
+              </div>
+            </div>
           </div>
         </UiCard>
 

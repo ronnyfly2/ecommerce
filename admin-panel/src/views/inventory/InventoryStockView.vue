@@ -201,7 +201,7 @@ onMounted(load)
   <div class="space-y-4">
     <ListViewToolbar>
       <template #filters>
-        <div class="grid w-full grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="grid w-full grid-cols-1 md:grid-cols-3 gap-3">
           <UiInput
             v-model="filters.search"
             size="sm"
@@ -243,8 +243,8 @@ onMounted(load)
         <template #head>
           <tr>
             <th class="table-th">Producto</th>
-            <th class="table-th">Delivery</th>
-            <th class="table-th">Retiro por tienda</th>
+            <th class="table-th text-center">Delivery</th>
+            <th v-for="store in stores" :key="store.id" class="table-th text-center">{{ store.name }}</th>
             <th class="table-th text-right">Total</th>
             <th class="table-th w-28"></th>
           </tr>
@@ -253,14 +253,14 @@ onMounted(load)
         <tr
           v-for="row in items"
           :key="row.productId"
-          class="table-tr-hover align-top"
+          class="table-tr-hover align-middle"
           :class="{ 'bg-amber-50/40': isRowDirty(row.productId) }"
         >
           <td class="table-td">
-            <div class="flex items-start gap-2">
+            <div class="flex items-center gap-2">
               <span
                 v-if="isRowDirty(row.productId)"
-                class="mt-1 size-2 rounded-full bg-amber-400 shrink-0"
+                class="size-2 rounded-full bg-amber-400 shrink-0"
                 title="Con cambios sin guardar"
               />
               <div>
@@ -270,32 +270,37 @@ onMounted(load)
             </div>
           </td>
 
-          <td class="table-td min-w-36">
-            <UiInput
-              v-model="draft.byProduct[row.productId].deliveryStock"
-              type="number"
-              min="0"
-              size="sm"
-              label="Stock"
-              :class="{ 'ring-2 ring-amber-400 ring-offset-1 rounded-md': isDirtyDelivery(row.productId) }"
-            />
-            <UiBadge v-if="row.alerts.lowDelivery" color="warning" class="mt-2">Bajo</UiBadge>
+          <td class="table-td min-w-32">
+            <div class="flex flex-col gap-1">
+              <UiInput
+                v-model="draft.byProduct[row.productId].deliveryStock"
+                type="number"
+                min="0"
+                size="sm"
+                :class="{ 'ring-2 ring-amber-400 ring-offset-1 rounded-md': isDirtyDelivery(row.productId) }"
+              />
+              <UiBadge v-if="row.alerts.lowDelivery" color="warning" class="text-xs">Bajo stock</UiBadge>
+            </div>
           </td>
 
-          <td class="table-td">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div v-for="storeStock in row.pickupStocks" :key="`${row.productId}-${storeStock.storeId}`">
+          <td
+            v-for="store in stores"
+            :key="`${row.productId}-${store.id}`"
+            class="table-td min-w-32"
+          >
+            <template v-if="draft.byProduct[row.productId]?.pickupStocks[store.id] !== undefined">
+              <div class="flex flex-col gap-1">
                 <UiInput
-                  v-model="draft.byProduct[row.productId].pickupStocks[storeStock.storeId]"
+                  v-model="draft.byProduct[row.productId].pickupStocks[store.id]"
                   type="number"
                   min="0"
                   size="sm"
-                  :label="storeStock.storeCode"
-                  :class="{ 'ring-2 ring-amber-400 ring-offset-1 rounded-md': isDirtyPickup(row.productId, storeStock.storeId) }"
+                  :class="{ 'ring-2 ring-amber-400 ring-offset-1 rounded-md': isDirtyPickup(row.productId, store.id) }"
                 />
-                <UiBadge v-if="isLowStore(row, storeStock.storeId)" color="warning" class="mt-1">Bajo</UiBadge>
+                <UiBadge v-if="isLowStore(row, store.id)" color="warning" class="text-xs">Bajo stock</UiBadge>
               </div>
-            </div>
+            </template>
+            <span v-else class="text-xs text-muted">—</span>
           </td>
 
           <td class="table-td text-right font-semibold">{{ row.totalStock }}</td>

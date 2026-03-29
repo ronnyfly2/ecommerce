@@ -25,6 +25,11 @@ export type ProductAttributeValue = {
   value: string | number | boolean;
 };
 
+export type ProductFeature = {
+  icon: string;
+  name: string;
+};
+
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn('uuid')
@@ -77,6 +82,9 @@ export class Product {
 
   @Column({ name: 'attribute_values', type: 'jsonb', default: () => "'[]'" })
   attributeValues: ProductAttributeValue[];
+
+  @Column({ name: 'features', type: 'jsonb', default: () => "'[]'" })
+  features: ProductFeature[];
 
   @ManyToOne(() => Category, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'category_id' })

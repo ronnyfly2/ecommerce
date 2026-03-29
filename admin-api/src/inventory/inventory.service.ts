@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { CreateInventoryAdjustmentDto } from './dto/create-inventory-adjustment.dto';
@@ -20,6 +20,8 @@ import { InventoryMovementType } from './enums/inventory-movement-type.enum';
 
 @Injectable()
 export class InventoryService {
+  private readonly logger = new Logger(InventoryService.name);
+
   constructor(
     @InjectRepository(InventoryMovement)
     private readonly movementsRepository: Repository<InventoryMovement>,
@@ -324,15 +326,27 @@ export class InventoryService {
       }),
     ]);
 
+    const validDeliveryStocks = deliveryStocks.filter((item) => item.product?.id);
+    const droppedDeliveryStocks = deliveryStocks.length - validDeliveryStocks.length;
+    if (droppedDeliveryStocks > 0) {
+      this.logger.warn(
+        `Detected ${droppedDeliveryStocks} orphan delivery stock row(s) while listing product stocks`,
+      );
+    }
+
+    const validPickupStocks = pickupStocks.filter((item) => item.product?.id && item.store?.id);
+    const droppedPickupStocks = pickupStocks.length - validPickupStocks.length;
+    if (droppedPickupStocks > 0) {
+      this.logger.warn(
+        `Detected ${droppedPickupStocks} orphan pickup stock row(s) while listing product stocks`,
+      );
+    }
+
     const deliveryByProduct = new Map(
-      deliveryStocks
-        .filter((item) => item.product?.id)
-        .map((item) => [item.product.id, item.stock]),
+      validDeliveryStocks.map((item) => [item.product.id, item.stock]),
     );
     const pickupByProductAndStore = new Map(
-      pickupStocks
-        .filter((item) => item.product?.id && item.store?.id)
-        .map((item) => [`${item.product.id}:${item.store.id}`, item.stock]),
+      validPickupStocks.map((item) => [`${item.product.id}:${item.store.id}`, item.stock]),
     );
 
     const items = products.map((product) => {

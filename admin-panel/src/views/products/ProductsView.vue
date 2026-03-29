@@ -248,6 +248,7 @@ function productModelLabel(product: Product) {
             <th class="table-th">Producto</th>
             <th class="table-th">Categoría</th>
             <th class="table-th">Perfil</th>
+            <th class="table-th">Características</th>
             <th class="table-th text-center">Moneda</th>
             <th class="table-th text-right">Precio base</th>
             <th class="table-th text-right">Precio default ({{ defaultCurrencyCode }})</th>
@@ -294,6 +295,24 @@ function productModelLabel(product: Product) {
           </td>
           <td class="table-td text-muted">
             <div class="text-sm text-surface-700">{{ productProfileSummary(p) }}</div>
+          </td>
+          <td class="table-td text-muted">
+            <div v-if="p.features?.length" class="flex flex-wrap gap-1">
+              <span
+                v-for="(feature, index) in p.features.slice(0, 2)"
+                :key="`${p.id}-feature-${index}`"
+                class="inline-flex items-center rounded-full bg-surface-100 px-2 py-0.5 text-[11px] text-surface-700"
+              >
+                {{ feature.name }}
+              </span>
+              <span
+                v-if="p.features.length > 2"
+                class="inline-flex items-center rounded-full bg-surface-200 px-2 py-0.5 text-[11px] text-surface-700"
+              >
+                +{{ p.features.length - 2 }}
+              </span>
+            </div>
+            <span v-else>—</span>
           </td>
           <td class="table-td text-center text-xs text-muted">{{ p.currencyCode }}</td>
           <td class="table-td text-right font-medium">{{ fmt(p.basePrice, p.currencyCode) }}</td>

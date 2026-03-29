@@ -2,6 +2,7 @@
 import { reactive, ref, onMounted, computed, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { productsService } from '@/services/products.service'
+import { inventoryService } from '@/services/inventory.service'
 import { couponsService } from '@/services/coupons.service'
 import { currenciesService } from '@/services/currencies.service'
 import { categoriesService, sizesService, colorsService, tagsService, measurementUnitsService } from '@/services/catalog.service'
@@ -9,6 +10,9 @@ import { extractErrorMessage } from '@/utils/error'
 import { CouponType } from '@/types/api'
 import type {
   Product,
+  ProductFeature,
+  ProductStockOverview,
+  UpsertProductStockDto,
   Category,
   Size,
   Color,
@@ -45,8 +49,30 @@ const isEdit = computed(() => !!id.value)
 
 const loading = ref(false)
 const saving = ref(false)
+const savingStock = ref(false)
 const uploadingImage = ref(false)
 const imageActionLoading = ref<string | null>(null)
+
+const productStock = ref<ProductStockOverview | null>(null)
+const stockDraft = reactive({ deliveryStock: 0, pickupStocks: {} as Record<string, number> })
+const stockOriginal = reactive({ deliveryStock: 0, pickupStocks: {} as Record<string, number> })
+
+const stockDirty = computed(() => {
+  if (!productStock.value) return false
+  if (stockDraft.deliveryStock !== stockOriginal.deliveryStock) return true
+  return productStock.value.pickupStocks.some(
+    (s) => stockDraft.pickupStocks[s.storeId] !== stockOriginal.pickupStocks[s.storeId],
+  )
+})
+
+const stockTotal = computed(() => {
+  if (!productStock.value) return 0
+  const pickupSum = productStock.value.pickupStocks.reduce(
+    (acc, s) => acc + Number(stockDraft.pickupStocks[s.storeId] ?? 0),
+    0,
+  )
+  return Number(stockDraft.deliveryStock) + pickupSum
+})
 
 const categories = ref<Category[]>([])
 const sizes = ref<Size[]>([])
@@ -87,6 +113,7 @@ const form = reactive({
   relatedProductIds: [] as string[],
   suggestedProductIds: [] as string[],
   attributeValues: {} as Record<string, string | number | boolean>,
+  features: [{ icon: '', name: '' }] as ProductFeature[],
   isActive: true,
   isFeatured: false,
 })
@@ -117,6 +144,7 @@ const formErrors = reactive({
   stock: '',
   offer: '',
   couponLink: '',
+  features: '',
 })
 
 const product = ref<Product | null>(null)
@@ -367,11 +395,52 @@ async function loadCatalogData() {
   }
 }
 
+async function loadProductStock() {
+  try {
+    const stock = await inventoryService.getProductStock(id.value)
+    productStock.value = stock
+    stockDraft.deliveryStock = stock.deliveryStock
+    stock.pickupStocks.forEach((s) => {
+      stockDraft.pickupStocks[s.storeId] = s.stock
+    })
+    stockOriginal.deliveryStock = stock.deliveryStock
+    stock.pickupStocks.forEach((s) => {
+      stockOriginal.pickupStocks[s.storeId] = s.stock
+    })
+  } catch {
+    // ignora si no hay stock registrado aún
+  }
+}
+
+async function saveProductStock() {
+  if (!productStock.value) return
+  savingStock.value = true
+  try {
+    const dto: UpsertProductStockDto = {
+      deliveryStock: Number(stockDraft.deliveryStock),
+      pickupStocks: productStock.value.pickupStocks.map((s) => ({
+        storeId: s.storeId,
+        stock: Number(stockDraft.pickupStocks[s.storeId] ?? 0),
+      })),
+    }
+    await inventoryService.upsertProductStock(id.value, dto)
+    stockOriginal.deliveryStock = Number(stockDraft.deliveryStock)
+    productStock.value.pickupStocks.forEach((s) => {
+      stockOriginal.pickupStocks[s.storeId] = Number(stockDraft.pickupStocks[s.storeId] ?? 0)
+    })
+    toast.success('Stock actualizado', 'El stock del producto fue guardado')
+  } catch {
+    toast.error('Error', 'No se pudo actualizar el stock')
+  } finally {
+    savingStock.value = false
+  }
+}
+
 async function loadProduct() {
   if (!isEdit.value) return
   loading.value = true
   try {
-    const p = await productsService.get(id.value)
+    const [p] = await Promise.all([productsService.get(id.value), loadProductStock()])
     product.value = p
 
     syncingProductCurrencyChange.value = true
@@ -401,6 +470,7 @@ async function loadProduct() {
     form.relatedProductIds = p.relatedProducts?.map((item) => item.id) ?? []
     form.suggestedProductIds = p.suggestedProducts?.map((item) => item.id) ?? []
     form.attributeValues = mapAttributeValuesToForm(p.attributeValues ?? [])
+    form.features = mapFeaturesToForm(p.features ?? [])
     form.isActive = p.isActive
     form.isFeatured = p.isFeatured
     previousProductCurrencyCode.value = form.currencyCode
@@ -446,6 +516,7 @@ function validateForm() {
   formErrors.stock = ''
   formErrors.offer = ''
   formErrors.couponLink = ''
+  formErrors.features = ''
 
   if (form.name.trim().length < 3) {
     formErrors.name = 'Ingresa al menos 3 caracteres'
@@ -471,9 +542,19 @@ function validateForm() {
     formErrors.couponLink = 'Ingresa un enlace valido (incluye http:// o https://)'
   }
 
+  const hasIncompleteFeature = form.features.some((feature) => {
+    const icon = feature.icon?.trim() || ''
+    const name = feature.name?.trim() || ''
+    return (icon || name) && (!icon || !name)
+  })
+
+  if (hasIncompleteFeature) {
+    formErrors.features = 'Cada caracteristica debe incluir icono/imagen SVG y nombre'
+  }
+
   formErrors.offer = getOfferError()
 
-  return !formErrors.name && !formErrors.categoryId && !formErrors.basePrice && !formErrors.stock && !formErrors.offer && !formErrors.couponLink
+  return !formErrors.name && !formErrors.categoryId && !formErrors.basePrice && !formErrors.stock && !formErrors.offer && !formErrors.couponLink && !formErrors.features
 }
 
 async function save() {
@@ -512,6 +593,7 @@ async function save() {
       relatedProductIds: form.relatedProductIds,
       suggestedProductIds: form.suggestedProductIds,
       attributeValues: buildAttributeValuesPayload(),
+      features: buildFeaturesPayload(),
       isActive: form.isActive,
       isFeatured: form.isFeatured,
       hasOffer: form.hasOffer,
@@ -598,6 +680,17 @@ function mapAttributeValuesToForm(values: Product['attributeValues']) {
   >
 }
 
+function mapFeaturesToForm(values: Product['features']) {
+  if (!values?.length) {
+    return [{ icon: '', name: '' }]
+  }
+
+  return values.map((feature) => ({
+    icon: feature.icon ?? '',
+    name: feature.name ?? '',
+  }))
+}
+
 function syncAttributeValuesWithCategory() {
   const nextValues: Record<string, string | number | boolean> = {}
 
@@ -626,6 +719,26 @@ function buildAttributeValuesPayload() {
       return { key: definition.key, value: textValue || null }
     })
     .filter((attribute) => attribute.value !== null && attribute.value !== '')
+}
+
+function buildFeaturesPayload() {
+  return form.features
+    .map((feature) => ({
+      icon: String(feature.icon ?? '').trim(),
+      name: String(feature.name ?? '').trim(),
+    }))
+    .filter((feature) => feature.icon && feature.name)
+}
+
+function addFeature() {
+  form.features.push({ icon: '', name: '' })
+}
+
+function removeFeature(index: number) {
+  form.features.splice(index, 1)
+  if (!form.features.length) {
+    form.features.push({ icon: '', name: '' })
+  }
 }
 
 function attributeFieldHint(definition: CategoryAttributeDefinition) {
@@ -749,6 +862,7 @@ async function createIndependentVariantProducts(parentProductId: string) {
         relatedProductIds: [],
         suggestedProductIds: [],
         variantProductIds: [],
+        features: buildFeaturesPayload(),
         isActive: variant.isActive,
         isFeatured: false,
         hasOffer: false,
@@ -1571,6 +1685,58 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
                 placeholder="Seleccionar moneda"
               />
 
+              <!-- Stock por tienda (solo en edición) -->
+              <div v-if="isEdit && productStock" class="lg:col-span-2 form-panel space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-medium text-surface-700">Stock por canal de entrega</p>
+                    <p class="text-xs text-surface-500">
+                      Total: <strong>{{ stockTotal }} unidades</strong> — edita y guarda sin salir del formulario.
+                    </p>
+                  </div>
+                  <UiButton
+                    v-if="stockDirty"
+                    type="button"
+                    size="sm"
+                    :loading="savingStock"
+                    @click="saveProductStock"
+                  >
+                    Guardar stock
+                  </UiButton>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <UiInput
+                      v-model="stockDraft.deliveryStock"
+                      type="number"
+                      min="0"
+                      size="lg"
+                      label="Delivery"
+                      :class="stockDraft.deliveryStock !== stockOriginal.deliveryStock ? 'ring-2 ring-amber-400 ring-offset-1 rounded-md' : ''"
+                    />
+                  </div>
+                  <div v-for="storeStock in productStock.pickupStocks" :key="storeStock.storeId">
+                    <UiInput
+                      v-model="stockDraft.pickupStocks[storeStock.storeId]"
+                      type="number"
+                      min="0"
+                      size="lg"
+                      :label="`Retiro — ${storeStock.storeName}`"
+                      :class="stockDraft.pickupStocks[storeStock.storeId] !== stockOriginal.pickupStocks[storeStock.storeId] ? 'ring-2 ring-amber-400 ring-offset-1 rounded-md' : ''"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <UiSelect
+                v-model="form.currencyCode"
+                label="Moneda"
+                size="lg"
+                :options="currencies.map(c => ({ value: c.code, label: `${c.code} (${c.symbol})` }))"
+                placeholder="Seleccionar moneda"
+              />
+
               <div v-if="activeAttributeCount" class="lg:col-span-2 form-panel space-y-3">
                 <div>
                   <p class="text-sm font-medium text-surface-700">Atributos dinámicos del rubro</p>
@@ -1808,6 +1974,57 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
                 <p class="text-xs text-surface-500">
                   Usage Mode: {{ usageModeLength }} chars
                 </p>
+              </div>
+
+              <div class="lg:col-span-2 form-panel space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-medium text-surface-700">Caracteristicas</p>
+                    <p class="text-xs text-surface-500">
+                      Agrega una o mas caracteristicas con icono/imagen SVG y nombre.
+                    </p>
+                  </div>
+                  <UiButton type="button" size="sm" variant="secondary" @click="addFeature">
+                    Agregar caracteristica
+                  </UiButton>
+                </div>
+
+                <p v-if="formErrors.features" class="text-xs text-danger-600">
+                  {{ formErrors.features }}
+                </p>
+
+                <div class="space-y-3">
+                  <div
+                    v-for="(feature, index) in form.features"
+                    :key="`feature-${index}`"
+                    class="grid grid-cols-1 lg:grid-cols-[1fr_1fr_auto] gap-3"
+                  >
+                    <UiInput
+                      v-model="feature.icon"
+                      label="Icono o imagen SVG"
+                      size="lg"
+                      placeholder="https://cdn.shop.com/icons/secure.svg o icon-shield"
+                    />
+                    <UiInput
+                      v-model="feature.name"
+                      label="Nombre"
+                      size="lg"
+                      placeholder="Pago seguro"
+                    />
+                    <div class="flex items-end">
+                      <UiButton
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        class="w-full lg:w-auto"
+                        :disabled="form.features.length === 1"
+                        @click="removeFeature(index)"
+                      >
+                        Quitar
+                      </UiButton>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="lg:col-span-2 space-y-2">

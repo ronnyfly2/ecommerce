@@ -400,6 +400,11 @@ export interface ProductAttributeValue {
   value: string | number | boolean
 }
 
+export interface ProductFeature {
+  icon: string
+  name: string
+}
+
 export interface Product {
   id: string
   name: string
@@ -421,6 +426,7 @@ export interface Product {
   offerPrice: string | null
   offerPercentage: string | null
   attributeValues: ProductAttributeValue[]
+  features: ProductFeature[]
   category: Category
   coupon: Coupon | null
   couponLink: string | null
@@ -464,6 +470,7 @@ export interface CreateProductDto {
   offerPrice?: number
   offerPercentage?: number
   attributeValues?: Array<{ key: string; value?: string | number | boolean | null }>
+  features?: ProductFeature[]
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}

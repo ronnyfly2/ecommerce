@@ -1,10 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -26,6 +28,18 @@ export class ProductAttributeValueDto {
   @ApiPropertyOptional({ example: 'Acero inoxidable' })
   @IsOptional()
   value?: string | number | boolean | null;
+}
+
+export class ProductFeatureDto {
+  @ApiProperty({ example: 'https://cdn.shop.com/icons/shipping.svg' })
+  @IsString()
+  @IsNotEmpty()
+  icon: string;
+
+  @ApiProperty({ example: 'Envío express' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 }
 
 export class CreateProductDto {
@@ -166,6 +180,14 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductAttributeValueDto)
   attributeValues?: ProductAttributeValueDto[];
+
+  @ApiPropertyOptional({ type: [ProductFeatureDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ProductFeatureDto)
+  features?: ProductFeatureDto[];
 
   @ApiPropertyOptional({ example: '9ecf76a3-8c9d-4561-b4ad-ef4f54d4ab18' })
   @IsOptional()
