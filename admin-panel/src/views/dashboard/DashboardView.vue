@@ -532,7 +532,7 @@ onMounted(async () => {
 
     <!-- Órdenes recientes -->
     <UiCard title="Órdenes recientes">
-      <div class="-mx-6 -mb-6">
+      <div class="p-4">
         <UiTable :data="recentOrders" :loading="recentOrdersLoading" :empty="recentOrdersEmpty" loading-color="primary" loading-text="Cargando órdenes recientes..." empty-message="Sin órdenes aún">
           <template #head>
             <tr>

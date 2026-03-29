@@ -27,7 +27,7 @@ const isEmpty = computed(() => {
 
 const loadingToneClass = computed(() => {
   const tones: Record<LoadingColor, string> = {
-    primary: 'bg-primary-600',
+    primary: 'bg-white-600',
     info: 'bg-info-600',
     success: 'bg-success-600',
     danger: 'bg-danger-600',
