@@ -15,6 +15,9 @@ import { CouponsService } from '../coupons/coupons.service';
 import { CouponsModule } from '../coupons/coupons.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CurrenciesModule } from '../currencies/currencies.module';
+import { ProductDeliveryStock } from '../inventory/entities/product-delivery-stock.entity';
+import { ProductStoreStock } from '../inventory/entities/product-store-stock.entity';
+import { Store } from '../inventory/entities/store.entity';
 
 @Module({
   imports: [
@@ -27,6 +30,9 @@ import { CurrenciesModule } from '../currencies/currencies.module';
       Coupon,
       CouponUsage,
       InventoryMovement,
+      ProductDeliveryStock,
+      ProductStoreStock,
+      Store,
       User,
     ]),
     CouponsModule,

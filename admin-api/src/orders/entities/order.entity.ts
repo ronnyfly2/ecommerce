@@ -13,6 +13,8 @@ import { Coupon } from '../../coupons/entities/coupon.entity';
 import { OrderItem } from './order-item.entity';
 import { ShippingAddress } from './shipping-address.entity';
 import { OrderStatus } from '../enums/order-status.enum';
+import { OrderFulfillmentType } from '../enums/order-fulfillment-type.enum';
+import { Store } from '../../inventory/entities/store.entity';
 
 @Entity('orders')
 export class Order {
@@ -41,6 +43,18 @@ export class Order {
 
   @Column({ name: 'currency_code', type: 'varchar', length: 3, default: 'USD' })
   currencyCode: string;
+
+  @Column({
+    name: 'fulfillment_type',
+    type: 'enum',
+    enum: OrderFulfillmentType,
+    default: OrderFulfillmentType.DELIVERY,
+  })
+  fulfillmentType: OrderFulfillmentType;
+
+  @ManyToOne(() => Store, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'pickup_store_id' })
+  pickupStore: Store | null;
 
   // Snapshot of exchange rate for historical consistency in reports.
   @Column({ name: 'exchange_rate_to_usd', type: 'decimal', precision: 14, scale: 6, default: 1 })

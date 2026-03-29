@@ -9,8 +9,10 @@ import {
   CATALOG_MANAGE_ROLES,
   COUPON_READ_ROLES,
   CURRENCY_MANAGE_ROLES,
+  INVENTORY_MANAGE_ROLES,
   INVENTORY_READ_ROLES,
   ORDER_READ_ROLES,
+  ORDER_MANAGE_ROLES,
   PRODUCT_MANAGE_ROLES,
   PRODUCT_READ_ROLES,
   USER_READ_ROLES,
@@ -96,6 +98,12 @@ const router = createRouter({
           meta: { title: 'Órdenes', roles: ORDER_READ_ROLES },
         },
         {
+          path: 'orders/new',
+          name: 'orders-new',
+          component: () => import('@/views/orders/OrderCreateView.vue'),
+          meta: { title: 'Nueva Orden', roles: ORDER_MANAGE_ROLES },
+        },
+        {
           path: 'orders/:id',
           name: 'orders-detail',
           component: () => import('@/views/orders/OrderDetailView.vue'),
@@ -136,6 +144,18 @@ const router = createRouter({
           name: 'inventory',
           component: () => import('@/views/inventory/InventoryView.vue'),
           meta: { title: 'Inventario', roles: INVENTORY_READ_ROLES },
+        },
+        {
+          path: 'inventory/stock',
+          name: 'inventory-stock',
+          component: () => import('@/views/inventory/InventoryStockView.vue'),
+          meta: { title: 'Stock por producto', roles: INVENTORY_READ_ROLES },
+        },
+        {
+          path: 'inventory/stores',
+          name: 'inventory-stores',
+          component: () => import('@/views/inventory/InventoryStoresView.vue'),
+          meta: { title: 'Tiendas', roles: INVENTORY_MANAGE_ROLES },
         },
 
         // Catálogo auxiliar

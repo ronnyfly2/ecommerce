@@ -10,6 +10,8 @@ import { Product } from '../../products/entities/product.entity';
 import { ProductVariant } from '../../products/entities/product-variant.entity';
 import { User } from '../../users/entities/user.entity';
 import { InventoryMovementType } from '../enums/inventory-movement-type.enum';
+import { InventoryChannel } from '../enums/inventory-channel.enum';
+import { Store } from './store.entity';
 
 @Entity('inventory_movements')
 export class InventoryMovement {
@@ -35,6 +37,13 @@ export class InventoryMovement {
 
   @Column({ type: 'varchar', nullable: true })
   reason: string | null;
+
+  @Column({ name: 'channel_type', type: 'enum', enum: InventoryChannel, nullable: true })
+  channelType: InventoryChannel | null;
+
+  @ManyToOne(() => Store, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'store_id' })
+  store: Store | null;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'created_by_id' })

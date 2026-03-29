@@ -1,7 +1,20 @@
 import { http } from './http'
-import type { ApiResponse, ApiListData, Order, OrderStats, UpdateOrderStatusDto, QueryOrdersDto } from '@/types/api'
+import type {
+  ApiResponse,
+  ApiListData,
+  Order,
+  OrderStats,
+  UpdateOrderStatusDto,
+  QueryOrdersDto,
+  CreateOrderDto,
+} from '@/types/api'
 
 export const ordersService = {
+  async create(dto: CreateOrderDto) {
+    const res = await http.post<ApiResponse<Order>>('/orders', dto)
+    return res.data.data
+  },
+
   async list(params?: QueryOrdersDto) {
     const res = await http.get<ApiResponse<ApiListData<Order>>>('/orders', { params })
     return res.data.data

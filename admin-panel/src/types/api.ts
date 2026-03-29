@@ -57,6 +57,12 @@ export const OrderStatus = {
 } as const
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus]
 
+export const OrderFulfillmentType = {
+  DELIVERY: 'delivery',
+  PICKUP: 'pickup',
+} as const
+export type OrderFulfillmentType = (typeof OrderFulfillmentType)[keyof typeof OrderFulfillmentType]
+
 export const CouponType = {
   PERCENTAGE: 'PERCENTAGE',
   FIXED_AMOUNT: 'FIXED_AMOUNT',
@@ -70,6 +76,12 @@ export const InventoryMovementType = {
   RETURN: 'RETURN',
 } as const
 export type InventoryMovementType = (typeof InventoryMovementType)[keyof typeof InventoryMovementType]
+
+export const InventoryChannel = {
+  DELIVERY: 'delivery',
+  PICKUP: 'pickup',
+} as const
+export type InventoryChannel = (typeof InventoryChannel)[keyof typeof InventoryChannel]
 
 export const NotificationType = {
   USER_REGISTERED: 'USER_REGISTERED',
@@ -493,6 +505,29 @@ export interface ShippingAddress {
   isDefault: boolean
 }
 
+export interface Store {
+  id: string
+  code: string
+  name: string
+  city: string
+  country: string
+  address: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateStoreDto {
+  code: string
+  name: string
+  city: string
+  country: string
+  address?: string
+  isActive?: boolean
+}
+
+export type UpdateStoreDto = Partial<CreateStoreDto>
+
 export interface OrderItem {
   id: string
   product: Product | null
@@ -510,6 +545,8 @@ export interface Order {
   id: string
   user: User
   status: OrderStatus
+  fulfillmentType: OrderFulfillmentType
+  pickupStore: Store | null
   subtotal: string
   discount: string
   total: string
@@ -532,6 +569,31 @@ export interface QueryOrdersDto {
   limit?: number
   status?: OrderStatus
   currencyCode?: string
+}
+
+export interface CreateOrderItemDto {
+  productId?: string
+  variantId?: string
+  quantity: number
+}
+
+export interface CreateOrderDto {
+  items: CreateOrderItemDto[]
+  couponCode?: string
+  currencyCode?: string
+  notes?: string
+  fulfillmentType?: OrderFulfillmentType
+  pickupStoreId?: string
+  shippingAddress?: {
+    firstName: string
+    lastName: string
+    street: string
+    city: string
+    state: string
+    postalCode: string
+    country: string
+    phoneNumber?: string
+  }
 }
 
 export interface OrderStats {
@@ -641,6 +703,8 @@ export interface InventoryMovement {
   product: Product | null
   variant: ProductVariant | null
   movementType: InventoryMovementType
+  channelType: InventoryChannel | null
+  store: Store | null
   quantityChange: number
   reason: string | null
   createdBy: User
@@ -653,6 +717,63 @@ export interface CreateInventoryAdjustmentDto {
   quantityChange: number
   type: InventoryMovementType
   reason?: string
+  channelType?: InventoryChannel
+  storeId?: string
+}
+
+export interface ProductPickupStock {
+  storeId: string
+  storeCode: string
+  storeName: string
+  stock: number
+}
+
+export interface ProductStockOverview {
+  productId: string
+  sku: string
+  deliveryStock: number
+  pickupStocks: ProductPickupStock[]
+  totalStock: number
+}
+
+export interface ProductStockListItem {
+  productId: string
+  productName: string
+  sku: string
+  deliveryStock: number
+  pickupStocks: ProductPickupStock[]
+  totalStock: number
+  alerts: {
+    lowDelivery: boolean
+    lowPickupStoreIds: string[]
+  }
+}
+
+export interface QueryProductStocksDto {
+  page?: number
+  limit?: number
+  search?: string
+  lowStockThreshold?: number
+  storeId?: string
+}
+
+export interface BulkUpsertProductStocksDto {
+  items: Array<{
+    productId: string
+    deliveryStock?: number
+    pickupStocks?: Array<{
+      storeId: string
+      stock: number
+    }>
+  }>
+}
+
+export interface UpsertProductStockDto {
+  deliveryStock?: number
+  pickupStocks?: Array<{
+    storeId: string
+    stock: number
+  }>
 }
 
 export interface QueryInventoryMovementsDto {

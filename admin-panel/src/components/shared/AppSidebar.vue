@@ -9,6 +9,7 @@ import {
   COUPON_READ_ROLES,
   CURRENCY_MANAGE_ROLES,
   INVENTORY_READ_ROLES,
+  INVENTORY_MANAGE_ROLES,
   ORDER_READ_ROLES,
   PRODUCT_READ_ROLES,
   USER_READ_ROLES,
@@ -68,6 +69,18 @@ const nav: NavItem[] = [
     label: 'Inventario',
     roles: INVENTORY_READ_ROLES,
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/>`,
+  },
+  {
+    name: 'inventory-stock',
+    label: 'Stock por producto',
+    roles: INVENTORY_READ_ROLES,
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5M6.75 4.5v15m5.25-15v15m5.25-15v15"/>`,
+  },
+  {
+    name: 'inventory-stores',
+    label: 'Tiendas',
+    roles: INVENTORY_MANAGE_ROLES,
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M3 9.75L12 3l9 6.75v9a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18.75v-9zM9 21v-6h6v6"/>`,
   },
   {
     name: 'users',

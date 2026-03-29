@@ -23,6 +23,9 @@ import { ChatGroupMember } from './chat/entities/chat-group-member.entity';
 import { ChatGroup } from './chat/entities/chat-group.entity';
 import { ChatMessage } from './chat/entities/chat-message.entity';
 import { ProductReview } from './reviews/entities/product-review.entity';
+import { Store } from './inventory/entities/store.entity';
+import { ProductDeliveryStock } from './inventory/entities/product-delivery-stock.entity';
+import { ProductStoreStock } from './inventory/entities/product-store-stock.entity';
 
 dotenv.config({ path: '.env' });
 
@@ -57,6 +60,9 @@ export const AppDataSource = new DataSource({
     ChatGroupMember,
     ChatMessage,
     ProductReview,
+    Store,
+    ProductDeliveryStock,
+    ProductStoreStock,
   ],
   migrations: ['src/migration/*.ts'],
   logging: false,

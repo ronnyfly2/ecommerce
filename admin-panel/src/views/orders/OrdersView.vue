@@ -19,11 +19,13 @@ import UiSelect from '@/components/ui/UiSelect.vue'
 import UiSortHeader from '@/components/ui/UiSortHeader.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { getSystemCurrencyCode } from '@/utils/system-currency'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const pg = usePagination(15)
+const auth = useAuthStore()
 
 const orders = ref<Order[] | null>(null)
 const currencies = ref<Currency[]>([])
@@ -34,6 +36,7 @@ const sortDir = ref<'asc' | 'desc'>('desc')
 const tableLoading = computed(() => orders.value === null)
 const statusFilter = toRef(filters, 'status')
 const currencyCodeFilter = toRef(filters, 'currencyCode')
+const canManageOrders = computed(() => auth.can('orders.manage'))
 
 function syncQuery() {
   const query: Record<string, string> = {}
@@ -172,6 +175,11 @@ onMounted(async () => {
           class="min-w-55"
         />
       </template>
+      <template #actions>
+        <UiButton v-if="canManageOrders" @click="router.push({ name: 'orders-new' })">
+          Nueva orden
+        </UiButton>
+      </template>
     </ListViewToolbar>
 
     <UiCard :padding="false">
@@ -181,6 +189,7 @@ onMounted(async () => {
             <th class="table-th">ID</th>
             <th class="table-th">Cliente</th>
             <th class="table-th">Estado</th>
+            <th class="table-th">Entrega</th>
             <th class="table-th">Moneda</th>
             <th class="table-th text-right">
               <UiSortHeader
@@ -207,6 +216,9 @@ onMounted(async () => {
           <td class="table-td">{{ o.user.email }}</td>
           <td class="table-td">
             <UiBadge :color="statusColor[o.status]" dot>{{ statusLabel[o.status] }}</UiBadge>
+          </td>
+          <td class="table-td text-xs text-surface-700">
+            {{ o.fulfillmentType === 'pickup' ? `Retiro · ${o.pickupStore?.code ?? 'Tienda'}` : 'Delivery' }}
           </td>
           <td class="table-td text-muted text-xs">{{ o.currencyCode }}</td>
           <td class="table-td text-right font-medium">{{ fmt(o.total, o.currencyCode) }}</td>

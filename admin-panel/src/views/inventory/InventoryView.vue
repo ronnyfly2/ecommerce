@@ -3,8 +3,8 @@ import { ref, reactive, onMounted, watch, computed, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { inventoryService } from '@/services/inventory.service'
 import { productsService } from '@/services/products.service'
-import { InventoryMovementType } from '@/types/api'
-import type { InventoryMovement, Product } from '@/types/api'
+import { InventoryMovementType, InventoryChannel } from '@/types/api'
+import type { InventoryMovement, Product, Store, ProductStockOverview } from '@/types/api'
 import { useToast } from '@/composables/useToast'
 import { usePagination } from '@/composables/usePagination'
 import { normalizeApiList } from '@/utils/api-list'
@@ -28,16 +28,28 @@ const auth = useAuthStore()
 
 const movements = ref<InventoryMovement[] | null>(null)
 const products = ref<Product[]>([])
+const stores = ref<Store[]>([])
 const initialized = ref(false)
 const tableLoading = computed(() => movements.value === null)
 const tableEmpty = computed(() => !tableLoading.value && (movements.value?.length ?? 0) === 0)
 const canManageInventory = computed(() => auth.can('inventory.manage'))
+
+const stockEditor = reactive({
+  productId: '',
+  loading: false,
+  saving: false,
+  deliveryStock: 0,
+  pickupStocks: {} as Record<string, number>,
+})
+const stockOverview = ref<ProductStockOverview | null>(null)
 
 const modal = reactive({
   show: false,
   loading: false,
   productId: '',
   variantId: '',
+  channelType: InventoryChannel.DELIVERY as InventoryChannel,
+  storeId: '',
   quantityChange: 0,
   type: InventoryMovementType.ADJUSTMENT as InventoryMovementType,
   reason: '',
@@ -62,6 +74,23 @@ const typeOptions = [
   { value: InventoryMovementType.RETURN, label: 'Devolución' },
 ]
 
+const channelOptions = [
+  { value: InventoryChannel.DELIVERY, label: 'Delivery / Online' },
+  { value: InventoryChannel.PICKUP, label: 'Retiro en tienda' },
+]
+
+function channelLabel(channel: InventoryMovement['channelType']) {
+  if (channel === InventoryChannel.PICKUP) {
+    return 'Retiro tienda'
+  }
+
+  if (channel === InventoryChannel.DELIVERY) {
+    return 'Delivery'
+  }
+
+  return 'General'
+}
+
 function movementColor(type: InventoryMovementType) {
   if (type === InventoryMovementType.PURCHASE || type === InventoryMovementType.RETURN) return 'text-success-600'
   if (type === InventoryMovementType.SALE) return 'text-danger-600'
@@ -71,6 +100,10 @@ function movementColor(type: InventoryMovementType) {
 async function loadProducts() {
   const data = await productsService.list({ page: 1, limit: 100 })
   products.value = normalizeApiList(data).items
+}
+
+async function loadStores() {
+  stores.value = await inventoryService.stores()
 }
 
 function productOptions() {
@@ -135,6 +168,8 @@ watch(productIdFilter, (nextProductId) => {
 function openAdjustment() {
   modal.productId = ''
   modal.variantId = ''
+  modal.channelType = InventoryChannel.DELIVERY
+  modal.storeId = ''
   modal.quantityChange = 0
   modal.type = InventoryMovementType.ADJUSTMENT
   modal.reason = ''
@@ -142,11 +177,18 @@ function openAdjustment() {
 }
 
 async function saveAdjustment() {
+  if (modal.channelType === InventoryChannel.PICKUP && !modal.storeId) {
+    toast.warning('Tienda requerida', 'Selecciona una tienda para el canal de retiro')
+    return
+  }
+
   modal.loading = true
   try {
     await inventoryService.adjust({
       productId: modal.productId || undefined,
       variantId: modal.variantId || undefined,
+      channelType: modal.channelType,
+      storeId: modal.channelType === InventoryChannel.PICKUP ? modal.storeId || undefined : undefined,
       quantityChange: Number(modal.quantityChange),
       type: modal.type,
       reason: modal.reason || undefined,
@@ -168,9 +210,71 @@ async function saveAdjustment() {
   }
 }
 
+async function loadStockOverview() {
+  if (!stockEditor.productId) {
+    stockOverview.value = null
+    return
+  }
+
+  stockEditor.loading = true
+  try {
+    const data = await inventoryService.getProductStock(stockEditor.productId)
+    stockOverview.value = data
+    stockEditor.deliveryStock = data.deliveryStock
+    stockEditor.pickupStocks = Object.fromEntries(
+      data.pickupStocks.map((item) => [item.storeId, item.stock]),
+    )
+  } catch {
+    toast.error('Error', 'No se pudo cargar el stock del producto')
+  } finally {
+    stockEditor.loading = false
+  }
+}
+
+async function saveStockOverview() {
+  if (!stockEditor.productId) {
+    toast.warning('Producto requerido', 'Selecciona un producto para editar stock')
+    return
+  }
+
+  stockEditor.saving = true
+  try {
+    const data = await inventoryService.upsertProductStock(stockEditor.productId, {
+      deliveryStock: Number(stockEditor.deliveryStock),
+      pickupStocks: stores.value.map((store) => ({
+        storeId: store.id,
+        stock: Number(stockEditor.pickupStocks[store.id] ?? 0),
+      })),
+    })
+
+    stockOverview.value = data
+    toast.success('Stock actualizado')
+    await loadMovements()
+  } catch {
+    toast.error('Error', 'No se pudo actualizar el stock')
+  } finally {
+    stockEditor.saving = false
+  }
+}
+
+const storeOptions = computed(() => [
+  { value: '', label: 'Seleccionar tienda' },
+  ...stores.value.map((store) => ({ value: store.id, label: `${store.code} · ${store.name}` })),
+])
+
+watch(() => modal.channelType, (channel) => {
+  if (channel !== InventoryChannel.PICKUP) {
+    modal.storeId = ''
+  }
+})
+
+watch(() => stockEditor.productId, async () => {
+  await loadStockOverview()
+})
+
 onMounted(async () => {
   try {
-    await loadProducts()
+    await Promise.all([loadProducts(), loadStores()])
     const page = Number(route.query.page ?? 1)
     pg.page.value = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1
     filters.productId = typeof route.query.productId === 'string' ? route.query.productId : ''
@@ -185,6 +289,51 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-4">
+    <UiCard v-if="canManageInventory" title="Stock por canal y tienda">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <UiSelect
+          v-model="stockEditor.productId"
+          searchable
+          label="Producto"
+          size="lg"
+          search-placeholder="Buscar producto..."
+          :options="productOptions().filter(option => option.value !== '')"
+        />
+
+        <UiInput
+          v-model="stockEditor.deliveryStock"
+          type="number"
+          min="0"
+          label="Stock Delivery / Online"
+          size="lg"
+          :disabled="!stockEditor.productId || stockEditor.loading"
+        />
+
+        <div class="flex items-end">
+          <UiButton class="w-full" :loading="stockEditor.saving" :disabled="!stockEditor.productId || stockEditor.loading" @click="saveStockOverview">
+            Guardar stock
+          </UiButton>
+        </div>
+      </div>
+
+      <div v-if="stockEditor.productId" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <UiInput
+          v-for="store in stores"
+          :key="store.id"
+          v-model="stockEditor.pickupStocks[store.id]"
+          type="number"
+          min="0"
+          :label="`Stock Retiro · ${store.code}`"
+          size="lg"
+          :disabled="stockEditor.loading"
+        />
+      </div>
+
+      <p v-if="stockOverview" class="mt-3 text-sm text-surface-700">
+        Stock total actual: <strong>{{ stockOverview.totalStock }}</strong>
+      </p>
+    </UiCard>
+
     <ListViewToolbar>
       <template #filters>
         <div class="grid w-full gap-3 sm:grid-cols-2">
@@ -223,6 +372,8 @@ onMounted(async () => {
             <th class="table-th">Fecha</th>
             <th class="table-th">Producto / Variante</th>
             <th class="table-th">Tipo</th>
+            <th class="table-th">Canal</th>
+            <th class="table-th">Tienda</th>
             <th class="table-th text-right">Cantidad</th>
             <th class="table-th">Motivo</th>
             <th class="table-th">Usuario</th>
@@ -238,6 +389,8 @@ onMounted(async () => {
             </div>
           </td>
           <td class="table-td">{{ m.movementType }}</td>
+          <td class="table-td text-muted">{{ channelLabel(m.channelType) }}</td>
+          <td class="table-td text-muted">{{ m.store?.code ?? '—' }}</td>
           <td :class="['table-td text-right font-semibold', movementColor(m.movementType)]">
             {{ m.quantityChange > 0 ? '+' : '' }}{{ m.quantityChange }}
           </td>
@@ -283,6 +436,19 @@ onMounted(async () => {
           label="Tipo de movimiento"
           size="lg"
           :options="typeOptions"
+        />
+        <UiSelect
+          v-model="modal.channelType"
+          label="Canal"
+          size="lg"
+          :options="channelOptions"
+        />
+        <UiSelect
+          v-if="modal.channelType === InventoryChannel.PICKUP"
+          v-model="modal.storeId"
+          label="Tienda"
+          size="lg"
+          :options="storeOptions"
         />
         <UiInput
           v-model="modal.quantityChange"

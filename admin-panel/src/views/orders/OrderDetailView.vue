@@ -150,6 +150,12 @@ onMounted(load)
               {{ statusLabel[order.status] }}
             </UiBadge>
           </div>
+          <div class="flex justify-between items-center">
+            <span class="text-muted">Fulfillment</span>
+            <span class="font-medium text-right">
+              {{ order.fulfillmentType === 'pickup' ? `Retiro en tienda (${order.pickupStore?.code ?? 'N/A'})` : 'Delivery' }}
+            </span>
+          </div>
           <div class="divider my-2" />
           <div class="flex justify-between">
             <span class="text-muted">Subtotal</span>
@@ -183,8 +189,14 @@ onMounted(load)
       </UiCard>
     </div>
 
-    <UiCard title="Dirección de envío">
-      <div v-if="order.shippingAddresses?.length" class="text-sm text-surface-700">
+    <UiCard :title="order.fulfillmentType === 'pickup' ? 'Retiro en tienda' : 'Dirección de envío'">
+      <div v-if="order.fulfillmentType === 'pickup'" class="text-sm text-surface-700">
+        <p class="font-medium">{{ order.pickupStore?.name ?? 'Tienda no especificada' }}</p>
+        <p class="text-muted">Código: {{ order.pickupStore?.code ?? '—' }}</p>
+        <p v-if="order.pickupStore?.address">{{ order.pickupStore.address }}</p>
+        <p>{{ order.pickupStore?.city ?? '—' }}, {{ order.pickupStore?.country ?? '—' }}</p>
+      </div>
+      <div v-else-if="order.shippingAddresses?.length" class="text-sm text-surface-700">
         <p class="font-medium">
           {{ order.shippingAddresses[0].firstName }} {{ order.shippingAddresses[0].lastName }}
         </p>

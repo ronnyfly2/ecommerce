@@ -16,7 +16,6 @@ import { OrderStatus } from './enums/order-status.enum';
 import { Product } from '../products/entities/product.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { CouponsService } from '../coupons/coupons.service';
-import { InventoryService } from '../inventory/inventory.service';
 import { Coupon } from '../coupons/entities/coupon.entity';
 import { CouponUsage } from '../coupons/entities/coupon-usage.entity';
 import { InventoryMovement } from '../inventory/entities/inventory-movement.entity';
@@ -25,6 +24,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/entities/user.entity';
 import { Role } from '../common/enums/role.enum';
 import { CurrenciesService } from '../currencies/currencies.service';
+import { OrderFulfillmentType } from './enums/order-fulfillment-type.enum';
+import { ProductDeliveryStock } from '../inventory/entities/product-delivery-stock.entity';
+import { ProductStoreStock } from '../inventory/entities/product-store-stock.entity';
+import { Store } from '../inventory/entities/store.entity';
+import { InventoryChannel } from '../inventory/enums/inventory-channel.enum';
 
 @Injectable()
 export class OrdersService {
@@ -49,6 +53,12 @@ export class OrdersService {
     private readonly inventoryRepository: Repository<InventoryMovement>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(ProductDeliveryStock)
+    private readonly deliveryStocksRepository: Repository<ProductDeliveryStock>,
+    @InjectRepository(ProductStoreStock)
+    private readonly storeStocksRepository: Repository<ProductStoreStock>,
+    @InjectRepository(Store)
+    private readonly storesRepository: Repository<Store>,
     private readonly couponsService: CouponsService,
     private readonly notificationsService: NotificationsService,
     private readonly currenciesService: CurrenciesService,
@@ -64,9 +74,25 @@ export class OrdersService {
     const orderCurrency = await this.currenciesService.ensureActive(
       this.normalizeCurrencyCode(dto.currencyCode || defaultCurrencyCode),
     );
+    const fulfillmentType = dto.fulfillmentType ?? OrderFulfillmentType.DELIVERY;
+    let pickupStore: Store | null = null;
+
+    if (fulfillmentType === OrderFulfillmentType.PICKUP) {
+      if (!dto.pickupStoreId) {
+        throw new BadRequestException('pickupStoreId is required for pickup orders');
+      }
+
+      pickupStore = await this.storesRepository.findOne({
+        where: { id: dto.pickupStoreId, isActive: true },
+      });
+      if (!pickupStore) {
+        throw new NotFoundException('Pickup store not found');
+      }
+    }
 
     let subtotal = 0;
     const orderItems: OrderItem[] = [];
+    const requestedByProduct = new Map<string, number>();
 
     for (const item of dto.items) {
       if (!item.productId && !item.variantId) {
@@ -126,6 +152,16 @@ export class OrdersService {
         throw new BadRequestException('Order item product could not be resolved');
       }
 
+      const alreadyRequested = requestedByProduct.get(product.id) ?? 0;
+      const nextRequested = alreadyRequested + item.quantity;
+      await this.assertFulfillmentStockAvailable(
+        product,
+        nextRequested,
+        fulfillmentType,
+        pickupStore,
+      );
+      requestedByProduct.set(product.id, nextRequested);
+
       const productCurrency = await this.currenciesService.ensureActive(
         this.normalizeCurrencyCode(product.currencyCode || defaultCurrencyCode),
       );
@@ -182,6 +218,8 @@ export class OrdersService {
       discount: discount.toFixed(2),
       total: total.toFixed(2),
       currencyCode: orderCurrency.code,
+      fulfillmentType,
+      pickupStore,
       exchangeRateToUsd: Number(orderCurrency.exchangeRateToUsd).toFixed(6),
       coupon: coupon ?? null,
       items: orderItems,
@@ -243,7 +281,13 @@ export class OrdersService {
 
     const [items, total] = await this.ordersRepository.findAndCount({
       where,
-      relations: { user: true, coupon: true, items: { product: true, variant: { product: true, size: true, color: true } }, shippingAddresses: true },
+      relations: {
+        user: true,
+        coupon: true,
+        pickupStore: true,
+        items: { product: true, variant: { product: true, size: true, color: true } },
+        shippingAddresses: true,
+      },
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -266,6 +310,7 @@ export class OrdersService {
       relations: {
         user: true,
         coupon: true,
+        pickupStore: true,
         items: { product: true, variant: { product: true, size: true, color: true } },
         shippingAddresses: true,
       },
@@ -411,10 +456,107 @@ export class OrdersService {
             quantityChange: -item.quantity,
             type: InventoryMovementType.SALE,
             reason: `Order ${order.id}`,
+            channelType:
+              order.fulfillmentType === OrderFulfillmentType.PICKUP
+                ? InventoryChannel.PICKUP
+                : InventoryChannel.DELIVERY,
+            store: order.pickupStore ?? null,
             createdBy: order.user,
           }),
         );
       }
+
+      if (product) {
+        await this.decrementFulfillmentStock(
+          product,
+          item.quantity,
+          order.fulfillmentType,
+          order.pickupStore ?? null,
+        );
+      }
     }
+  }
+
+  private async assertFulfillmentStockAvailable(
+    product: Product,
+    requestedQuantity: number,
+    fulfillmentType: OrderFulfillmentType,
+    pickupStore: Store | null,
+  ) {
+    if (fulfillmentType === OrderFulfillmentType.DELIVERY) {
+      const deliveryStock = await this.deliveryStocksRepository.findOne({
+        where: { product: { id: product.id } },
+      });
+      const available = deliveryStock?.stock ?? 0;
+      if (available < requestedQuantity) {
+        throw new BadRequestException(
+          `Insufficient delivery stock for product ${product.sku}. Available: ${available}, requested: ${requestedQuantity}`,
+        );
+      }
+
+      return;
+    }
+
+    if (!pickupStore) {
+      throw new BadRequestException('Pickup store is required');
+    }
+
+    const pickupStock = await this.storeStocksRepository.findOne({
+      where: {
+        product: { id: product.id },
+        store: { id: pickupStore.id },
+      },
+    });
+    const available = pickupStock?.stock ?? 0;
+    if (available < requestedQuantity) {
+      throw new BadRequestException(
+        `Insufficient pickup stock for product ${product.sku} at ${pickupStore.code}. Available: ${available}, requested: ${requestedQuantity}`,
+      );
+    }
+  }
+
+  private async decrementFulfillmentStock(
+    product: Product,
+    quantity: number,
+    fulfillmentType: OrderFulfillmentType,
+    pickupStore: Store | null,
+  ) {
+    if (fulfillmentType === OrderFulfillmentType.DELIVERY) {
+      const deliveryStock = await this.deliveryStocksRepository.findOne({
+        where: { product: { id: product.id } },
+        relations: { product: true },
+      });
+
+      if (!deliveryStock || deliveryStock.stock < quantity) {
+        throw new BadRequestException(
+          `Insufficient delivery stock for product ${product.sku}`,
+        );
+      }
+
+      deliveryStock.stock -= quantity;
+      await this.deliveryStocksRepository.save(deliveryStock);
+      return;
+    }
+
+    if (!pickupStore) {
+      throw new BadRequestException('Pickup store is required');
+    }
+
+    const pickupStock = await this.storeStocksRepository.findOne({
+      where: {
+        product: { id: product.id },
+        store: { id: pickupStore.id },
+      },
+      relations: { product: true, store: true },
+    });
+
+    if (!pickupStock || pickupStock.stock < quantity) {
+      throw new BadRequestException(
+        `Insufficient pickup stock for product ${product.sku} at ${pickupStore.code}`,
+      );
+    }
+
+    pickupStock.stock -= quantity;
+    await this.storeStocksRepository.save(pickupStock);
   }
 }

@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsUUID, IsArray, ValidateNested, IsNumber, IsOptional, Min } from 'class-validator';
+import {
+  IsString,
+  IsUUID,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  IsOptional,
+  Min,
+  IsEnum,
+  ValidateIf,
+} from 'class-validator';
 import { Type } from 'class-transformer';
+import { OrderFulfillmentType } from '../enums/order-fulfillment-type.enum';
 
 export class ShippingAddressDto {
   @ApiProperty({ example: 'John' })
@@ -75,6 +86,16 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ enum: OrderFulfillmentType, example: OrderFulfillmentType.DELIVERY })
+  @IsOptional()
+  @IsEnum(OrderFulfillmentType)
+  fulfillmentType?: OrderFulfillmentType;
+
+  @ApiPropertyOptional({ example: 'f77222c7-2648-4ef4-8488-350f53e6805b' })
+  @ValidateIf((dto: CreateOrderDto) => dto.fulfillmentType === OrderFulfillmentType.PICKUP)
+  @IsUUID()
+  pickupStoreId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
