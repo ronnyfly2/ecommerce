@@ -30,6 +30,17 @@ const currencies = ref<Currency[]>([])
 const selectedCurrencyCode = ref('')
 const tableLoading = computed(() => coupons.value === null)
 const tableEmpty = computed(() => !tableLoading.value && displayedCoupons.value.length === 0)
+
+const tableColumns = [
+  { key: 'code', label: 'Código' },
+  { key: 'type', label: 'Tipo' },
+  { key: 'currency', label: 'Moneda' },
+  { key: 'value', label: 'Valor', align: 'right' as const },
+  { key: 'minimum', label: 'Mínimo', align: 'right' as const },
+  { key: 'usage', label: 'Uso', align: 'center' as const },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'actions', actions: true },
+]
 const canManageCoupons = computed(() => auth.can('coupons.manage'))
 
 const formModal = reactive({
@@ -262,19 +273,7 @@ watch(
     </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="displayedCoupons" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando cupones..." empty-message="No hay cupones">
-        <template #head>
-          <tr>
-            <th class="table-th">Código</th>
-            <th class="table-th">Tipo</th>
-            <th class="table-th">Moneda</th>
-            <th class="table-th text-right">Valor</th>
-            <th class="table-th text-right">Mínimo</th>
-            <th class="table-th text-center">Uso</th>
-            <th class="table-th text-center">Estado</th>
-            <th class="table-th table-actions-th" />
-          </tr>
-        </template>
+      <UiTable :data="displayedCoupons" :loading="tableLoading" :empty="tableEmpty" :columns="tableColumns" loading-color="primary" loading-text="Cargando cupones..." empty-message="No hay cupones">
 
         <tr v-for="c in displayedCoupons" :key="c.id" class="table-tr-hover">
           <td class="table-td">

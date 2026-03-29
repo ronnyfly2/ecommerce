@@ -456,6 +456,7 @@ body {
   right: 0;
   z-index: 2;
   background-color: color-mix(in srgb, var(--color-surface-50) 92%, white 8%);
+  backdrop-filter: blur(6px);
 }
 
 @utility table-actions-td {
@@ -483,7 +484,7 @@ body {
 }
 
 @utility table-tr-hover {
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: box-shadow var(--transition-fast);
 
   &:focus-within {
     outline: 2px solid var(--color-primary-200);
@@ -491,7 +492,6 @@ body {
   }
 
   &:hover {
-    transform: translateY(-1px);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary-200) 45%, transparent);
   }
 
@@ -508,8 +508,16 @@ body {
   background-color: color-mix(in srgb, var(--color-surface-50) 52%, white 48%);
 }
 
-.table-base tbody tr:last-child > .table-td {
+.table-base tbody tr:last-child > .table-td,
+.table-base tbody tr:last-child > .table-actions-td {
   border-bottom: none;
+}
+
+@utility table-tr-selected {
+  > .table-td,
+  > .table-actions-td {
+    background-color: color-mix(in srgb, var(--color-primary-100) 40%, white 60%) !important;
+  }
 }
 
 @media (max-width: 768px) {

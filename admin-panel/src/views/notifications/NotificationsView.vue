@@ -35,6 +35,14 @@ const filters = reactive<{
 const loading = computed(() => items.value === null)
 const empty = computed(() => !loading.value && (items.value?.length ?? 0) === 0)
 
+const tableColumns = [
+  { key: 'type', label: 'Tipo' },
+  { key: 'message', label: 'Mensaje' },
+  { key: 'date', label: 'Fecha' },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'actions', actions: true },
+]
+
 const typeOptions = [
   { value: '', label: 'Todos los tipos' },
   { value: NotificationType.ORDER_CREATED, label: 'Compras' },
@@ -167,16 +175,7 @@ onMounted(() => {
         <FormToggleField v-model="filters.unreadOnly" label="Solo no leidas" size="sm" @update:model-value="applyFilters" />
       </div>
 
-      <UiTable :data="items" :loading="loading" :empty="empty" loading-text="Cargando notificaciones..." empty-message="No hay notificaciones para este filtro">
-        <template #head>
-          <tr>
-            <th class="table-th">Tipo</th>
-            <th class="table-th">Mensaje</th>
-            <th class="table-th">Fecha</th>
-            <th class="table-th text-center">Estado</th>
-            <th class="table-th table-actions-th" />
-          </tr>
-        </template>
+      <UiTable :data="items" :loading="loading" :empty="empty" :columns="tableColumns" loading-text="Cargando notificaciones..." empty-message="No hay notificaciones para este filtro">
 
         <tr v-for="item in items ?? []" :key="item.id" class="table-tr-hover">
           <td class="table-td">

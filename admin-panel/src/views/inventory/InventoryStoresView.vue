@@ -38,6 +38,14 @@ const confirm = reactive({
 })
 
 const tableLoading = computed(() => stores.value === null)
+
+const tableColumns = [
+  { key: 'code', label: 'Código' },
+  { key: 'name', label: 'Nombre' },
+  { key: 'location', label: 'Ubicación' },
+  { key: 'status', label: 'Estado' },
+  { key: 'actions', label: 'Acciones', align: 'right' as const, class: 'w-48' },
+]
 const filteredStores = computed(() => {
   const rows = stores.value ?? []
   const q = search.value.trim().toLowerCase()
@@ -165,17 +173,9 @@ onMounted(load)
         :data="filteredStores"
         :loading="tableLoading"
         :empty="!tableLoading && filteredStores.length === 0"
+        :columns="tableColumns"
         empty-message="Sin tiendas"
       >
-        <template #head>
-          <tr>
-            <th class="table-th">Código</th>
-            <th class="table-th">Nombre</th>
-            <th class="table-th">Ubicación</th>
-            <th class="table-th">Estado</th>
-            <th class="table-th w-48 text-right">Acciones</th>
-          </tr>
-        </template>
 
         <tr v-for="store in filteredStores" :key="store.id" class="table-tr-hover">
           <td class="table-td font-mono">{{ store.code }}</td>

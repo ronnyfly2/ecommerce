@@ -2,9 +2,10 @@
 import { ref, reactive, watch, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { productsService } from '@/services/products.service'
+import { inventoryService } from '@/services/inventory.service'
 import { currenciesService } from '@/services/currencies.service'
 import { categoriesService, tagsService } from '@/services/catalog.service'
-import type { Product, Category, Tag, Currency } from '@/types/api'
+import type { Product, Category, Tag, Currency, ProductStockOverview } from '@/types/api'
 import { useToast } from '@/composables/useToast'
 import { usePagination } from '@/composables/usePagination'
 import { normalizeApiList } from '@/utils/api-list'
@@ -32,6 +33,7 @@ const products  = ref<Product[] | null>(null)
 const categories = ref<Category[]>([])
 const tags = ref<Tag[]>([])
 const currencies = ref<Currency[]>([])
+const stockByProductId = ref<Record<string, ProductStockOverview>>({})
 const search    = ref('')
 const categoryId = ref('')
 const tagId = ref('')
@@ -45,6 +47,21 @@ const defaultCurrencyCode = computed(() => {
   return active.find((item) => item.isDefault)?.code ?? getSystemCurrencyCode()
 })
 const canManageProducts = computed(() => auth.can('products.manage'))
+
+const tableColumns = computed(() => [
+  { key: 'product', label: 'Producto' },
+  { key: 'category', label: 'Categoría' },
+  { key: 'profile', label: 'Perfil' },
+  { key: 'features', label: 'Características' },
+  { key: 'currency', label: 'Moneda', align: 'center' as const },
+  { key: 'basePrice', label: 'Precio base', align: 'right' as const },
+  { key: 'defaultPrice', label: `Precio default (${defaultCurrencyCode.value})`, align: 'right' as const },
+  { key: 'offer', label: 'Oferta', align: 'right' as const },
+  { key: 'stock', label: 'Stock', align: 'center' as const },
+  { key: 'variants', label: 'Versiones', align: 'center' as const },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'actions', actions: true },
+])
 
 function syncQuery() {
   const query: Record<string, string> = {}
@@ -66,6 +83,7 @@ async function loadFilters() {
 
 async function load() {
   products.value = null
+  stockByProductId.value = {}
   try {
     const data = await productsService.list({
       page: pg.page.value,
@@ -79,6 +97,22 @@ async function load() {
     const result = normalizeApiList(data)
     products.value = result.items
     pg.total.value = result.total
+
+    const stockResults = await Promise.allSettled(
+      result.items.map(async (item) => {
+        const stock = await inventoryService.getProductStock(item.id)
+        return [item.id, stock] as const
+      }),
+    )
+
+    const stockMap: Record<string, ProductStockOverview> = {}
+    for (const entry of stockResults) {
+      if (entry.status === 'fulfilled') {
+        const [productId, stock] = entry.value
+        stockMap[productId] = stock
+      }
+    }
+    stockByProductId.value = stockMap
   } catch {
     products.value = []
     toast.error('Error', 'No se pudo cargar los productos')
@@ -178,6 +212,16 @@ function productProfileSummary(product: Product) {
 function productModelLabel(product: Product) {
   return product.category?.supportsSizeColorVariants ? 'Con versiones' : 'Producto directo'
 }
+
+function visiblePickupStocks(stock?: ProductStockOverview) {
+  if (!stock) return []
+  return stock.pickupStocks.slice(0, 2)
+}
+
+function hiddenPickupCount(stock?: ProductStockOverview) {
+  if (!stock) return 0
+  return Math.max(stock.pickupStocks.length - 2, 0)
+}
 </script>
 
 <template>
@@ -242,23 +286,7 @@ function productModelLabel(product: Product) {
 
     <!-- Tabla -->
     <UiCard :padding="false">
-      <UiTable :data="products" :loading="tableLoading" loading-color="primary" loading-text="Cargando productos..." empty-message="No hay productos">
-        <template #head>
-          <tr>
-            <th class="table-th">Producto</th>
-            <th class="table-th">Categoría</th>
-            <th class="table-th">Perfil</th>
-            <th class="table-th">Características</th>
-            <th class="table-th text-center">Moneda</th>
-            <th class="table-th text-right">Precio base</th>
-            <th class="table-th text-right">Precio default ({{ defaultCurrencyCode }})</th>
-            <th class="table-th text-right">Oferta</th>
-            <th class="table-th text-center">Stock</th>
-            <th class="table-th text-center">Versiones</th>
-            <th class="table-th text-center">Estado</th>
-            <th class="table-th table-actions-th" />
-          </tr>
-        </template>
+      <UiTable :data="products" :loading="tableLoading" :columns="tableColumns" loading-color="primary" loading-text="Cargando productos..." empty-message="No hay productos">
 
         <tr
           v-for="p in products ?? []"
@@ -324,9 +352,32 @@ function productModelLabel(product: Product) {
             <span v-else class="text-muted">—</span>
           </td>
           <td class="table-td text-center">
-            <UiBadge :color="p.stock > 0 ? 'success' : 'danger'" dot>
-              {{ p.stock }}
-            </UiBadge>
+            <div class="space-y-1">
+              <UiBadge :color="(stockByProductId[p.id]?.totalStock ?? p.stock) > 0 ? 'success' : 'danger'" dot>
+                {{ stockByProductId[p.id]?.totalStock ?? p.stock }}
+              </UiBadge>
+              <p class="text-[11px] text-muted">
+                Delivery: {{ stockByProductId[p.id]?.deliveryStock ?? 0 }}
+              </p>
+              <div
+                v-if="stockByProductId[p.id]?.pickupStocks?.length"
+                class="flex flex-wrap justify-center gap-1"
+              >
+                <span
+                  v-for="storeStock in visiblePickupStocks(stockByProductId[p.id])"
+                  :key="`${p.id}-pickup-${storeStock.storeId}`"
+                  class="inline-flex items-center rounded-full bg-surface-100 px-2 py-0.5 text-[10px] text-surface-700"
+                >
+                  {{ storeStock.storeCode }}: {{ storeStock.stock }}
+                </span>
+                <span
+                  v-if="hiddenPickupCount(stockByProductId[p.id]) > 0"
+                  class="inline-flex items-center rounded-full bg-surface-200 px-2 py-0.5 text-[10px] text-surface-700"
+                >
+                  +{{ hiddenPickupCount(stockByProductId[p.id]) }}
+                </span>
+              </div>
+            </div>
           </td>
           <td class="table-td text-center">
             <span class="text-muted">{{ p.variantProducts?.length ?? 0 }}</span>

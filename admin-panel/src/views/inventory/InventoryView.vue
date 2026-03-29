@@ -32,6 +32,17 @@ const stores = ref<Store[]>([])
 const initialized = ref(false)
 const tableLoading = computed(() => movements.value === null)
 const tableEmpty = computed(() => !tableLoading.value && (movements.value?.length ?? 0) === 0)
+
+const tableColumns = [
+  { key: 'date', label: 'Fecha' },
+  { key: 'product', label: 'Producto / Variante' },
+  { key: 'type', label: 'Tipo' },
+  { key: 'channel', label: 'Canal' },
+  { key: 'store', label: 'Tienda' },
+  { key: 'quantity', label: 'Cantidad', align: 'right' as const },
+  { key: 'reason', label: 'Motivo' },
+  { key: 'user', label: 'Usuario' },
+]
 const canManageInventory = computed(() => auth.can('inventory.manage'))
 
 const stockEditor = reactive({
@@ -366,19 +377,7 @@ onMounted(async () => {
     </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="movements" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando movimientos..." empty-message="Sin movimientos de inventario">
-        <template #head>
-          <tr>
-            <th class="table-th">Fecha</th>
-            <th class="table-th">Producto / Variante</th>
-            <th class="table-th">Tipo</th>
-            <th class="table-th">Canal</th>
-            <th class="table-th">Tienda</th>
-            <th class="table-th text-right">Cantidad</th>
-            <th class="table-th">Motivo</th>
-            <th class="table-th">Usuario</th>
-          </tr>
-        </template>
+      <UiTable :data="movements" :loading="tableLoading" :empty="tableEmpty" :columns="tableColumns" loading-color="primary" loading-text="Cargando movimientos..." empty-message="Sin movimientos de inventario">
 
         <tr v-for="m in movements ?? []" :key="m.id" class="table-tr-hover">
           <td class="table-td text-xs text-muted">{{ new Date(m.createdAt).toLocaleString('es-AR') }}</td>

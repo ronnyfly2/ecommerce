@@ -1,5 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import UiSortHeader from './UiSortHeader.vue'
+
+export type SortDir = 'asc' | 'desc'
+
+export type TableColumn = {
+  key: string
+  label?: string
+  align?: 'left' | 'center' | 'right'
+  sortable?: boolean
+  class?: string
+  actions?: boolean
+}
 
 type LoadingColor = 'primary' | 'info' | 'success' | 'danger' | 'neutral'
 
@@ -12,12 +24,18 @@ const props = withDefaults(defineProps<{
   loadingColor?: LoadingColor
   compact?: boolean
   noMinWidth?: boolean
+  columns?: TableColumn[]
+  sortBy?: string
+  sortDir?: SortDir
 }>(), {
   loadingText: 'Cargando...',
   loadingColor: 'primary',
   compact: false,
   noMinWidth: false,
 })
+
+const emit = defineEmits<{ sort: [key: string] }>()
+
 const isLoading = computed(() => props.loading ?? props.data === null)
 const isEmpty = computed(() => {
   if (typeof props.empty === 'boolean') return props.empty
@@ -27,14 +45,24 @@ const isEmpty = computed(() => {
 
 const loadingToneClass = computed(() => {
   const tones: Record<LoadingColor, string> = {
-    primary: 'bg-white-600',
+    primary: 'bg-primary-50',
+    info: 'bg-info-50',
+    success: 'bg-success-50',
+    danger: 'bg-danger-50',
+    neutral: 'bg-surface-100',
+  }
+  return tones[props.loadingColor]
+})
+
+const loadingDotClass = computed(() => {
+  const dots: Record<LoadingColor, string> = {
+    primary: 'bg-primary-600',
     info: 'bg-info-600',
     success: 'bg-success-600',
     danger: 'bg-danger-600',
-    neutral: 'bg-surface-700',
+    neutral: 'bg-surface-500',
   }
-
-  return tones[props.loadingColor]
+  return dots[props.loadingColor]
 })
 </script>
 
@@ -45,12 +73,12 @@ const loadingToneClass = computed(() => {
       :class="loadingToneClass"
       class="mx-auto flex w-fit min-w-56 flex-col items-center justify-center gap-3 rounded-xl px-6 py-5 md:min-w-64 md:gap-4"
     >
-      <div class="flex items-center gap-2" role="status" aria-label="Cargando">
-        <span class="h-3 w-3 rounded-full bg-primary-800 animate-bounce md:h-4 md:w-4 [animation-duration:700ms] md:[animation-duration:550ms]" style="animation-delay: 0ms" />
-        <span class="h-3 w-3 rounded-full bg-primary-800 animate-bounce md:h-4 md:w-4 [animation-duration:700ms] md:[animation-duration:550ms]" style="animation-delay: 120ms" />
-        <span class="h-3 w-3 rounded-full bg-primary-800 animate-bounce md:h-4 md:w-4 [animation-duration:700ms] md:[animation-duration:550ms]" style="animation-delay: 240ms" />
+      <div class="flex items-center gap-2" role="status" :aria-label="loadingText">
+        <span :class="loadingDotClass" class="h-3 w-3 rounded-full animate-bounce md:h-4 md:w-4 [animation-duration:700ms] md:[animation-duration:550ms]" style="animation-delay: 0ms" />
+        <span :class="loadingDotClass" class="h-3 w-3 rounded-full animate-bounce md:h-4 md:w-4 [animation-duration:700ms] md:[animation-duration:550ms]" style="animation-delay: 120ms" />
+        <span :class="loadingDotClass" class="h-3 w-3 rounded-full animate-bounce md:h-4 md:w-4 [animation-duration:700ms] md:[animation-duration:550ms]" style="animation-delay: 240ms" />
       </div>
-      <p class="text-sm font-medium text-black">{{ loadingText }}</p>
+      <p class="text-sm font-medium text-surface-700">{{ loadingText }}</p>
     </div>
   </div>
 
@@ -59,9 +87,11 @@ const loadingToneClass = computed(() => {
     v-else-if="isEmpty"
     class="flex flex-col items-center justify-center py-16 text-center"
   >
-    <svg class="w-12 h-12 text-primary-800 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-    </svg>
+    <slot name="empty-icon">
+      <svg class="w-12 h-12 text-primary-800 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+      </svg>
+    </slot>
     <p class="text-muted">{{ emptyMessage ?? 'No hay resultados' }}</p>
     <div v-if="$slots['empty-actions']" class="mt-4">
       <slot name="empty-actions" />
@@ -82,11 +112,36 @@ const loadingToneClass = computed(() => {
       compact ? 'table-base-compact' : '',
     ]">
       <thead>
-        <slot name="head" />
+        <template v-if="$slots.head">
+          <slot name="head" />
+        </template>
+        <tr v-else-if="columns?.length">
+          <th
+            v-for="col in columns"
+            :key="col.key"
+            :class="[
+              col.actions ? 'table-th table-actions-th' : 'table-th',
+              col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : '',
+              col.class ?? '',
+            ]"
+          >
+            <UiSortHeader
+              v-if="col.sortable && col.label"
+              :label="col.label"
+              :active="sortBy === col.key"
+              :direction="sortDir"
+              @toggle="emit('sort', col.key)"
+            />
+            <span v-else-if="!col.actions">{{ col.label }}</span>
+          </th>
+        </tr>
       </thead>
       <tbody>
         <slot />
       </tbody>
     </table>
+    <div v-if="$slots.footer" class="border-t border-surface-200">
+      <slot name="footer" />
+    </div>
   </div>
 </template>

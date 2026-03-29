@@ -159,6 +159,13 @@ const imageUpload = reactive({
 const imageActionLoading = ref<string | null>(null)
 const canManageProducts = computed(() => auth.can('products.manage'))
 
+const variantColumns = [
+  { key: 'product', label: 'Producto' },
+  { key: 'price', label: 'Precio', align: 'right' as const },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'actions', actions: true },
+]
+
 const sortedImages = computed(() => {
   const items = product.value?.images ?? []
   return [...items].sort((a, b) => a.displayOrder - b.displayOrder)
@@ -400,15 +407,7 @@ const suggestedForDisplay = computed(() => {
           </div>
 
           <div class="-mx-6">
-            <UiTable compact :empty="!product.variantProducts?.length" empty-message="Sin variantes independientes">
-              <template #head>
-                <tr>
-                  <th class="table-th">Producto</th>
-                  <th class="table-th text-right">Precio</th>
-                  <th class="table-th text-center">Estado</th>
-                  <th class="table-th table-actions-th" />
-                </tr>
-              </template>
+            <UiTable compact :columns="variantColumns" :empty="!product.variantProducts?.length" empty-message="Sin variantes independientes">
 
               <tr v-for="variantProduct in product.variantProducts" :key="variantProduct.id" class="table-tr-hover">
                 <td class="table-td">

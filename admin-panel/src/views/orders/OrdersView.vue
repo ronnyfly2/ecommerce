@@ -16,7 +16,6 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiPagination from '@/components/ui/UiPagination.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
-import UiSortHeader from '@/components/ui/UiSortHeader.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import { getSystemCurrencyCode } from '@/utils/system-currency'
 import { useAuthStore } from '@/stores/auth'
@@ -31,7 +30,7 @@ const orders = ref<Order[] | null>(null)
 const currencies = ref<Currency[]>([])
 const filters = reactive<{ status: '' | OrderStatus; currencyCode: string }>({ status: '', currencyCode: '' })
 const initialized = ref(false)
-const sortBy = ref<'createdAt' | 'total'>('createdAt')
+const sortBy = ref<string>('createdAt')
 const sortDir = ref<'asc' | 'desc'>('desc')
 const tableLoading = computed(() => orders.value === null)
 const statusFilter = toRef(filters, 'status')
@@ -109,7 +108,18 @@ const displayedOrders = computed(() => {
 })
 const tableEmpty = computed(() => !tableLoading.value && displayedOrders.value.length === 0)
 
-function toggleSort(column: 'createdAt' | 'total') {
+const tableColumns = [
+  { key: 'id', label: 'ID' },
+  { key: 'client', label: 'Cliente' },
+  { key: 'status', label: 'Estado' },
+  { key: 'fulfillment', label: 'Entrega' },
+  { key: 'currency', label: 'Moneda' },
+  { key: 'total', label: 'Total', align: 'right' as const, sortable: true },
+  { key: 'createdAt', label: 'Fecha', sortable: true },
+  { key: 'actions', actions: true },
+]
+
+function toggleSort(column: string) {
   if (sortBy.value === column) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
     return
@@ -183,33 +193,18 @@ onMounted(async () => {
     </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="displayedOrders" :loading="tableLoading" :empty="tableEmpty" loading-color="primary" loading-text="Cargando órdenes..." empty-message="No hay órdenes">
-        <template #head>
-          <tr>
-            <th class="table-th">ID</th>
-            <th class="table-th">Cliente</th>
-            <th class="table-th">Estado</th>
-            <th class="table-th">Entrega</th>
-            <th class="table-th">Moneda</th>
-            <th class="table-th text-right">
-              <UiSortHeader
-                label="Total"
-                :active="sortBy === 'total'"
-                :direction="sortDir"
-                @toggle="toggleSort('total')"
-              />
-            </th>
-            <th class="table-th">
-              <UiSortHeader
-                label="Fecha"
-                :active="sortBy === 'createdAt'"
-                :direction="sortDir"
-                @toggle="toggleSort('createdAt')"
-              />
-            </th>
-            <th class="table-th table-actions-th" />
-          </tr>
-        </template>
+      <UiTable
+        :data="displayedOrders"
+        :loading="tableLoading"
+        :empty="tableEmpty"
+        :columns="tableColumns"
+        :sort-by="sortBy"
+        :sort-dir="sortDir"
+        loading-color="primary"
+        loading-text="Cargando órdenes..."
+        empty-message="No hay órdenes"
+        @sort="toggleSort"
+      >
 
         <tr v-for="o in displayedOrders" :key="o.id" class="table-tr-hover">
           <td class="table-td font-mono text-xs text-surface-500">#{{ o.id.slice(0, 8) }}</td>

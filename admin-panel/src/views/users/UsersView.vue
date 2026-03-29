@@ -33,6 +33,15 @@ const users = ref<User[] | null>(null)
 const filters = reactive({ search: '', role: '' as '' | Role, isActive: '' as '' | 'true' | 'false' })
 const initialized = ref(false)
 const tableLoading = computed(() => users.value === null)
+
+const tableColumns = [
+  { key: 'email', label: 'Usuario' },
+  { key: 'name', label: 'Nombre' },
+  { key: 'role', label: 'Rol', align: 'center' as const },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'createdAt', label: 'Creado' },
+  { key: 'actions', actions: true },
+]
 const canManageUsers = computed(() => auth.can('users.manage'))
 const canDeleteUsers = computed(() => auth.can('users.delete'))
 const searchFilter = toRef(filters, 'search')
@@ -238,17 +247,7 @@ async function removeUser() {
     </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="users" :loading="tableLoading" loading-color="primary" loading-text="Cargando usuarios..." empty-message="No hay usuarios">
-        <template #head>
-          <tr>
-            <th class="table-th">Usuario</th>
-            <th class="table-th">Nombre</th>
-            <th class="table-th text-center">Rol</th>
-            <th class="table-th text-center">Estado</th>
-            <th class="table-th">Creado</th>
-            <th class="table-th table-actions-th" />
-          </tr>
-        </template>
+      <UiTable :data="users" :loading="tableLoading" :columns="tableColumns" loading-color="primary" loading-text="Cargando usuarios..." empty-message="No hay usuarios">
 
         <tr v-for="u in users ?? []" :key="u.id" class="table-tr-hover">
           <td class="table-td font-medium">{{ u.email }}</td>

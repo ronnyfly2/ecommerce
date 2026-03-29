@@ -77,6 +77,15 @@ function isRowDirty(productId: string) {
   return Object.keys(d.pickupStocks).some((sid) => d.pickupStocks[sid] !== o.pickupStocks[sid])
 }
 
+function rowTotal(row: ProductStockListItem) {
+  const d = rowDraft(row)
+  const pickupTotal = row.pickupStocks.reduce(
+    (sum, s) => sum + Number(d?.pickupStocks[s.storeId] ?? s.stock),
+    0,
+  )
+  return Number(d?.deliveryStock ?? row.deliveryStock) + pickupTotal
+}
+
 async function load() {
   loading.value = true
   try {
@@ -111,13 +120,28 @@ async function saveRow(row: ProductStockListItem) {
   rowSaving.value[row.productId] = true
   try {
     const d = rowDraft(row)
-    await inventoryService.upsertProductStock(row.productId, {
+    const updated = await inventoryService.upsertProductStock(row.productId, {
       deliveryStock: Number(d?.deliveryStock ?? 0),
       pickupStocks: row.pickupStocks.map((s) => ({
         storeId: s.storeId,
         stock: Number(d?.pickupStocks[s.storeId] ?? 0),
       })),
     })
+
+    row.deliveryStock = updated.deliveryStock
+    row.totalStock = updated.totalStock
+    row.pickupStocks = row.pickupStocks.map((s) => {
+      const fresh = updated.pickupStocks.find((item) => item.storeId === s.storeId)
+      return {
+        ...s,
+        stock: Number(fresh?.stock ?? 0),
+      }
+    })
+    row.alerts.lowDelivery = row.deliveryStock <= Number(filters.lowStockThreshold)
+    row.alerts.lowPickupStoreIds = row.pickupStocks
+      .filter((s) => s.stock <= Number(filters.lowStockThreshold))
+      .map((s) => s.storeId)
+
     // commit draft to original (no full reload)
     original.byProduct[row.productId] = {
       deliveryStock: Number(d.deliveryStock),
@@ -303,7 +327,7 @@ onMounted(load)
             <span v-else class="text-xs text-muted">—</span>
           </td>
 
-          <td class="table-td text-right font-semibold">{{ row.totalStock }}</td>
+          <td class="table-td text-right font-semibold">{{ rowTotal(row) }}</td>
 
           <td class="table-td">
             <UiButton

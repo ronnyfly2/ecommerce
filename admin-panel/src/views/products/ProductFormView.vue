@@ -47,6 +47,22 @@ const toast = useToast()
 const id = computed(() => String(route.params.id ?? ''))
 const isEdit = computed(() => !!id.value)
 
+const initialVariantsColumns = [
+  { key: 'sku', label: 'SKU' },
+  { key: 'size', label: 'Talla' },
+  { key: 'color', label: 'Color' },
+  { key: 'priceAdj', label: 'Ajuste de precio', align: 'right' as const },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'actions', actions: true },
+]
+
+const variantProductsColumns = [
+  { key: 'product', label: 'Producto' },
+  { key: 'price', label: 'Precio', align: 'right' as const },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'actions', actions: true },
+]
+
 const loading = ref(false)
 const saving = ref(false)
 const savingStock = ref(false)
@@ -2136,17 +2152,7 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
                   </div>
 
                   <div>
-                    <UiTable :data="initialVariants" compact empty-message="Aun no agregaste variantes iniciales">
-                      <template #head>
-                        <tr>
-                          <th class="table-th">SKU</th>
-                          <th class="table-th">Talla</th>
-                          <th class="table-th">Color</th>
-                          <th class="table-th text-right">Ajuste de precio</th>
-                          <th class="table-th text-center">Estado</th>
-                          <th class="table-th table-actions-th" />
-                        </tr>
-                      </template>
+                    <UiTable :data="initialVariants" :columns="initialVariantsColumns" compact empty-message="Aun no agregaste variantes iniciales">
 
                       <tr v-for="(item, index) in initialVariants" :key="item.sku" class="table-tr-hover">
                         <td class="table-td font-mono text-xs">{{ item.sku }}</td>
@@ -2422,15 +2428,7 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
         <UiCard v-if="isEdit && product" title="Versiones vinculadas">
           <template #default>
             <div class="-mx-6 -mb-6">
-              <UiTable :data="selectedVariantProducts" compact :empty="!selectedVariantProducts.length" empty-message="No hay variantes vinculadas">
-                <template #head>
-                  <tr>
-                    <th class="table-th">Producto</th>
-                    <th class="table-th text-right">Precio</th>
-                    <th class="table-th text-center">Estado</th>
-                    <th class="table-th table-actions-th" />
-                  </tr>
-                </template>
+              <UiTable :data="selectedVariantProducts" :columns="variantProductsColumns" compact :empty="!selectedVariantProducts.length" empty-message="No hay variantes vinculadas">
 
                 <tr v-for="variantProduct in selectedVariantProducts" :key="variantProduct.id" class="table-tr-hover">
                   <td class="table-td">

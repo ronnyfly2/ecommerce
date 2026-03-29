@@ -24,6 +24,15 @@ const sessions = ref<RefreshTokenRecord[] | null>(null)
 const closingAll = ref(false)
 const revokingId = ref<string | null>(null)
 const tableLoading = computed(() => sessions.value === null)
+
+const tableColumns = [
+  { key: 'device', label: 'Dispositivo' },
+  { key: 'ip', label: 'IP' },
+  { key: 'created', label: 'Creada' },
+  { key: 'lastUsed', label: 'Último uso' },
+  { key: 'expires', label: 'Expira' },
+  { key: 'actions', actions: true },
+]
 const showLocalSeedConfig = import.meta.env.DEV
 const seedActionLoading = ref<
   'run' | 'clean-seed' | 'clean-seed-force' | 'clean-users-all' | 'clean-all' | null
@@ -334,17 +343,7 @@ onMounted(loadSessions)
       </div>
 
       <div class="-mx-6 -mb-6">
-        <UiTable :data="sessions" :loading="tableLoading" loading-color="primary" loading-text="Cargando sesiones..." empty-message="No hay sesiones activas">
-          <template #head>
-            <tr>
-              <th class="table-th">Dispositivo</th>
-              <th class="table-th">IP</th>
-              <th class="table-th">Creada</th>
-              <th class="table-th">Último uso</th>
-              <th class="table-th">Expira</th>
-              <th class="table-th table-actions-th" />
-            </tr>
-          </template>
+        <UiTable :data="sessions" :loading="tableLoading" :columns="tableColumns" loading-color="primary" loading-text="Cargando sesiones..." empty-message="No hay sesiones activas">
 
           <tr v-for="s in sessions ?? []" :key="s.tokenId" class="table-tr-hover">
             <td class="table-td">

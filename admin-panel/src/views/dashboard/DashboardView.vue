@@ -143,6 +143,15 @@ const customRangeDays = computed(() => {
 const canApplyCustomRange = computed(() => salesPreset.value === 'custom' && !customRangeError.value)
 const recentOrdersLoading = computed(() => recentOrders.value === null)
 const recentOrdersEmpty = computed(() => !recentOrdersLoading.value && (recentOrders.value?.length ?? 0) === 0)
+
+const tableColumns = [
+  { key: 'id', label: 'ID' },
+  { key: 'client', label: 'Cliente' },
+  { key: 'status', label: 'Estado' },
+  { key: 'currency', label: 'Moneda' },
+  { key: 'total', label: 'Total', align: 'right' as const },
+  { key: 'date', label: 'Fecha' },
+]
 const recentOrdersTotalPages = computed(() => Math.max(1, Math.ceil(recentOrdersTotal.value / recentOrdersLimit)))
 const showRecentOrdersPagination = computed(() => recentOrdersTotalPages.value > 1)
 
@@ -533,17 +542,7 @@ onMounted(async () => {
     <!-- Órdenes recientes -->
     <UiCard title="Órdenes recientes">
       <div class="p-4">
-        <UiTable :data="recentOrders" :loading="recentOrdersLoading" :empty="recentOrdersEmpty" loading-color="primary" loading-text="Cargando órdenes recientes..." empty-message="Sin órdenes aún">
-          <template #head>
-            <tr>
-              <th class="table-th">ID</th>
-              <th class="table-th">Cliente</th>
-              <th class="table-th">Estado</th>
-              <th class="table-th">Moneda</th>
-              <th class="table-th text-right">Total</th>
-              <th class="table-th">Fecha</th>
-            </tr>
-          </template>
+        <UiTable :data="recentOrders" :loading="recentOrdersLoading" :empty="recentOrdersEmpty" :columns="tableColumns" loading-color="primary" loading-text="Cargando órdenes recientes..." empty-message="Sin órdenes aún">
 
           <tr
             v-for="o in recentOrders ?? []"
