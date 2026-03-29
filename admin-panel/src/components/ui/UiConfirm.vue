@@ -42,7 +42,7 @@ useDialogA11y(computed(() => props.show), panelRef, () => emit('cancel'))
           <div class="flex items-start gap-4">
             <div
               :class="[
-                'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+                'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                 props.variant === 'warning'
                   ? 'bg-warning-100 text-warning-800'
                   : 'bg-danger-100  text-danger-700',

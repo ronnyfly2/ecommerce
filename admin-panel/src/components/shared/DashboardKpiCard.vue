@@ -10,7 +10,7 @@ defineProps<{
 
 <template>
   <UiCard :padding="false">
-    <div class="p-5 sm:p-6 flex items-center gap-4 min-h-[112px]">
+    <div class="p-5 sm:p-6 flex items-center gap-4 min-h-28">
       <div
         :class="[
           'w-12 h-12 rounded-xl flex items-center justify-center shrink-0',

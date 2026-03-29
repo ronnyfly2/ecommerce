@@ -16,7 +16,7 @@ const ui = useUiStore()
     <main
       :class="[
         'pt-16 min-h-screen transition-all duration-300',
-        ui.sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-[260px]',
+        ui.sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-65',
       ]"
     >
       <div class="p-6">

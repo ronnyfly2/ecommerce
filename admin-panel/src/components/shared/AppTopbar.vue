@@ -233,7 +233,7 @@ onUnmounted(() => {
             >
               <button
                 type="button"
-                class="w-full px-4 py-3 text-left hover:bg-surface-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-[-2px]"
+                class="w-full px-4 py-3 text-left hover:bg-surface-100 focus-visible:outline focus-visible:outline-primary-500 focus-visible:-outline-offset-2"
                 :aria-label="`${item.title}. ${item.message}. ${formatRelative(item.createdAt)}`"
                 @click="handleNotificationClick(item.id, item.link)"
               >

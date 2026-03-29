@@ -28,7 +28,7 @@ const pages = computed(() => {
     </p>
     <nav class="flex items-center gap-1 ml-auto" aria-label="Paginación">
       <button
-        class="btn-base btn-ghost btn-sm disabled:!opacity-100 disabled:!text-surface-700"
+        class="btn-base btn-ghost btn-sm disabled:opacity-100! disabled:text-surface-700!"
         :disabled="page <= 1"
         aria-label="Página anterior"
         @click="emit('change', page - 1)"
@@ -46,7 +46,7 @@ const pages = computed(() => {
           :aria-label="`Ir a la página ${p}`"
           :aria-current="p === page ? 'page' : undefined"
           :class="[
-            'btn-base btn-sm min-w-[32px]',
+            'btn-base btn-sm min-w-8',
             p === page ? 'btn-primary' : 'btn-ghost',
           ]"
           @click="emit('change', Number(p))"
@@ -56,7 +56,7 @@ const pages = computed(() => {
       </template>
 
       <button
-        class="btn-base btn-ghost btn-sm disabled:!opacity-100 disabled:!text-surface-700"
+        class="btn-base btn-ghost btn-sm disabled:opacity-100! disabled:text-surface-700!"
         :disabled="page >= totalPages"
         aria-label="Página siguiente"
         @click="emit('change', page + 1)"

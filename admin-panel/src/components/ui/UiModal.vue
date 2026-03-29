@@ -71,7 +71,7 @@ useDialogA11y(computed(() => props.show), panelRef, () => emit('close'))
           <!-- Footer -->
           <div
             v-if="$slots.footer"
-            class="px-6 py-4 border-t border-surface-200 flex flex-col items-stretch justify-end gap-3 sm:flex-row sm:items-center [&>*]:w-full sm:[&>*]:w-auto"
+            class="px-6 py-4 border-t border-surface-200 flex flex-col items-stretch justify-end gap-3 sm:flex-row sm:items-center *:w-full sm:*:w-auto"
           >
             <slot name="footer" />
           </div>

@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 type ApiEnvelope<T> = {
   statusCode: number
   message: string
@@ -289,7 +291,7 @@ describe('UI Full Flow - Inventory, Stores, Orders', () => {
         name: body.name,
         city: body.city,
         country: body.country,
-        address: body.address ?? null,
+        address: body.address ?? '',
         isActive: body.isActive ?? true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -492,7 +494,8 @@ describe('UI Full Flow - Inventory, Stores, Orders', () => {
 
     // CSV export
     cy.window().then((win) => {
-      cy.stub(win.URL, 'createObjectURL').returns('blob:mock').as('createBlobUrl')
+      const createBlobUrlStub = cy.stub(win.URL, 'createObjectURL').returns('blob:mock')
+      cy.wrap(createBlobUrlStub).as('createBlobUrl')
     })
     cy.contains('button', 'Exportar CSV').click()
     cy.get('@createBlobUrl').should('have.been.called')
