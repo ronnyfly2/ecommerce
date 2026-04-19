@@ -13,6 +13,35 @@ import type {
   CreateTagDto,
 } from '@/types/api'
 
+type CatalogCrudService<TEntity, TCreateDto> = {
+  list: () => Promise<TEntity[]>
+  create: (dto: TCreateDto) => Promise<TEntity>
+  update: (id: string, dto: Partial<TCreateDto>) => Promise<TEntity>
+  remove: (id: string) => Promise<void>
+}
+
+function createCatalogService<TEntity, TCreateDto>(endpoint: string): CatalogCrudService<TEntity, TCreateDto> {
+  const basePath = `/${endpoint}`
+
+  return {
+    async list() {
+      const res = await http.get<ApiResponse<TEntity[]>>(basePath)
+      return res.data.data
+    },
+    async create(dto) {
+      const res = await http.post<ApiResponse<TEntity>>(basePath, dto)
+      return res.data.data
+    },
+    async update(id, dto) {
+      const res = await http.patch<ApiResponse<TEntity>>(`${basePath}/${id}`, dto)
+      return res.data.data
+    },
+    async remove(id) {
+      await http.delete(`${basePath}/${id}`)
+    },
+  }
+}
+
 export const categoriesService = {
   async list() {
     const res = await http.get<ApiResponse<Category[]>>('/categories')
@@ -35,74 +64,7 @@ export const categoriesService = {
   },
 }
 
-export const sizesService = {
-  async list() {
-    const res = await http.get<ApiResponse<Size[]>>('/sizes')
-    return res.data.data
-  },
-  async create(dto: CreateSizeDto) {
-    const res = await http.post<ApiResponse<Size>>('/sizes', dto)
-    return res.data.data
-  },
-  async update(id: string, dto: Partial<CreateSizeDto>) {
-    const res = await http.patch<ApiResponse<Size>>(`/sizes/${id}`, dto)
-    return res.data.data
-  },
-  async remove(id: string) {
-    await http.delete(`/sizes/${id}`)
-  },
-}
-
-export const measurementUnitsService = {
-  async list() {
-    const res = await http.get<ApiResponse<MeasurementUnit[]>>('/measurement-units')
-    return res.data.data
-  },
-  async create(dto: CreateMeasurementUnitDto) {
-    const res = await http.post<ApiResponse<MeasurementUnit>>('/measurement-units', dto)
-    return res.data.data
-  },
-  async update(id: string, dto: Partial<CreateMeasurementUnitDto>) {
-    const res = await http.patch<ApiResponse<MeasurementUnit>>(`/measurement-units/${id}`, dto)
-    return res.data.data
-  },
-  async remove(id: string) {
-    await http.delete(`/measurement-units/${id}`)
-  },
-}
-
-export const colorsService = {
-  async list() {
-    const res = await http.get<ApiResponse<Color[]>>('/colors')
-    return res.data.data
-  },
-  async create(dto: CreateColorDto) {
-    const res = await http.post<ApiResponse<Color>>('/colors', dto)
-    return res.data.data
-  },
-  async update(id: string, dto: Partial<CreateColorDto>) {
-    const res = await http.patch<ApiResponse<Color>>(`/colors/${id}`, dto)
-    return res.data.data
-  },
-  async remove(id: string) {
-    await http.delete(`/colors/${id}`)
-  },
-}
-
-export const tagsService = {
-  async list() {
-    const res = await http.get<ApiResponse<Tag[]>>('/tags')
-    return res.data.data
-  },
-  async create(dto: CreateTagDto) {
-    const res = await http.post<ApiResponse<Tag>>('/tags', dto)
-    return res.data.data
-  },
-  async update(id: string, dto: Partial<CreateTagDto>) {
-    const res = await http.patch<ApiResponse<Tag>>(`/tags/${id}`, dto)
-    return res.data.data
-  },
-  async remove(id: string) {
-    await http.delete(`/tags/${id}`)
-  },
-}
+export const sizesService = createCatalogService<Size, CreateSizeDto>('sizes')
+export const measurementUnitsService = createCatalogService<MeasurementUnit, CreateMeasurementUnitDto>('measurement-units')
+export const colorsService = createCatalogService<Color, CreateColorDto>('colors')
+export const tagsService = createCatalogService<Tag, CreateTagDto>('tags')

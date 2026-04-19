@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import { sizesService } from '@/services/catalog.service'
 import type { Size } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
@@ -15,100 +15,38 @@ import CatalogActionsCell from '@/components/catalog/CatalogActionsCell.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
 import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
-import { useToast } from '@/composables/useToast'
+import { useResourceList } from '@/composables/useResourceList'
+import { useCrudForm } from '@/composables/useCrudForm'
 
-const toast = useToast()
-const sizes = ref<Size[] | null>(null)
-const tableLoading = computed(() => sizes.value === null)
-
-const formModal = reactive({
-  show: false,
-  loading: false,
-  isEdit: false,
-  id: '',
-  name: '',
-  abbreviation: '',
-  displayOrder: 0,
-})
-const confirm = reactive({ show: false, id: '', name: '', loading: false })
-
-async function load() {
-  sizes.value = null
-  try {
-    sizes.value = await sizesService.list()
-  } catch {
-    sizes.value = []
-    toast.error('Error', 'No se pudieron cargar las tallas')
-  }
-}
-
-function openCreate() {
-  formModal.isEdit = false
-  formModal.id = ''
-  formModal.name = ''
-  formModal.abbreviation = ''
-  formModal.displayOrder = 0
-  formModal.show = true
-}
-
-function openEdit(size: Size) {
-  formModal.isEdit = true
-  formModal.id = size.id
-  formModal.name = size.name
-  formModal.abbreviation = size.abbreviation
-  formModal.displayOrder = Number(size.displayOrder ?? 0)
-  formModal.show = true
-}
+const { items: sizes, loading: tableLoading, load } = useResourceList<Size>(
+  () => sizesService.list(),
+  'No se pudieron cargar las tallas',
+)
 
 function normalizedAbbreviation(value: string) {
   return value.trim().toUpperCase()
 }
 
-async function saveSize() {
-  formModal.loading = true
-  try {
-    const payload = {
-      name: formModal.name.trim(),
-      abbreviation: normalizedAbbreviation(formModal.abbreviation),
-      displayOrder: Number(formModal.displayOrder),
-    }
-
-    if (formModal.isEdit) {
-      await sizesService.update(formModal.id, payload)
-      toast.success('Talla actualizada')
-    } else {
-      await sizesService.create(payload)
-      toast.success('Talla creada')
-    }
-
-    formModal.show = false
-    await load()
-  } catch {
-    toast.error('Error', 'No se pudo guardar la talla')
-  } finally {
-    formModal.loading = false
-  }
-}
-
-function askDelete(size: Size) {
-  confirm.id = size.id
-  confirm.name = size.name
-  confirm.show = true
-}
-
-async function removeSize() {
-  confirm.loading = true
-  try {
-    await sizesService.remove(confirm.id)
-    toast.success('Talla eliminada')
-    confirm.show = false
-    await load()
-  } catch {
-    toast.error('Error', 'No se pudo eliminar la talla')
-  } finally {
-    confirm.loading = false
-  }
-}
+const { formModal, confirm, openCreate, openEdit, save: saveSize, askDelete, confirmDelete: removeSize } = useCrudForm<
+  Size,
+  { name: string; abbreviation: string; displayOrder: number }
+>({
+  service: sizesService,
+  entityName: 'Talla',
+  formDefaults: () => ({ name: '', abbreviation: '', displayOrder: 0 }),
+  fillForm: (form, size) => {
+    form.name = size.name
+    form.abbreviation = size.abbreviation
+    form.displayOrder = Number(size.displayOrder ?? 0)
+  },
+  buildPayload: (form) => ({
+    name: form.name.trim(),
+    abbreviation: normalizedAbbreviation(form.abbreviation),
+    displayOrder: Number(form.displayOrder),
+  }),
+  getDeleteName: (size) => size.name,
+  onSuccess: load,
+})
 
 onMounted(load)
 </script>

@@ -1,5 +1,15 @@
 import 'cypress-axe'
 
+type AxeNodeLike = {
+  target: string[]
+  html?: string
+}
+
+type AxeViolationLike = {
+  id: string
+  nodes: AxeNodeLike[]
+}
+
 // Cypress support file for E2E tests
 // This file runs before all tests and can contain custom commands and global hooks
 
@@ -7,7 +17,7 @@ import 'cypress-axe'
 // import './commands'
 
 // Disable uncaught exception handler for testing
-Cypress.on('uncaught:exception', (err, runnable) => {
+Cypress.on('uncaught:exception', (err, _runnable) => {
   // Return false to prevent Cypress from failing the test
   // This handles cases where the application throws expected errors
   if (
@@ -19,11 +29,6 @@ Cypress.on('uncaught:exception', (err, runnable) => {
   return true
 });
 
-// Configure timeouts
-Cypress.Commands.overwrite('visit', (originalFn, url, options) => {
-  return originalFn(url, { ...options, onBeforeLoad: () => {} })
-});
-
 Cypress.Commands.add('runA11yAudit', (context, options) => {
   cy.injectAxe()
   cy.checkA11y(
@@ -33,11 +38,13 @@ Cypress.Commands.add('runA11yAudit', (context, options) => {
       ...options,
     },
     (violations) => {
-      if (violations.length === 0) {
+      const typedViolations = violations as AxeViolationLike[]
+
+      if (typedViolations.length === 0) {
         return
       }
 
-      const details = violations
+      const details = typedViolations
         .map((violation) => {
           const nodeDetails = violation.nodes
             .map((node) => {

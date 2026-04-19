@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import { measurementUnitsService } from '@/services/catalog.service'
-import { extractErrorMessage } from '@/utils/error'
 import type { MeasurementUnit, MeasurementUnitFamily } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiButton from '@/components/ui/UiButton.vue'
@@ -19,11 +18,8 @@ import FormModalActions from '@/components/forms/FormModalActions.vue'
 import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
-import { useToast } from '@/composables/useToast'
-
-const toast = useToast()
-const measurementUnits = ref<MeasurementUnit[] | null>(null)
-const tableLoading = computed(() => measurementUnits.value === null)
+import { useResourceList } from '@/composables/useResourceList'
+import { useCrudForm } from '@/composables/useCrudForm'
 
 const familyLabels: Record<MeasurementUnitFamily, string> = {
   weight: 'Peso',
@@ -40,115 +36,53 @@ const familyOptions = (Object.keys(familyLabels) as MeasurementUnitFamily[]).map
   label: familyLabels[family],
 }))
 
-const formModal = reactive({
-  show: false,
-  loading: false,
-  isEdit: false,
-  id: '',
-  code: '',
-  label: '',
-  family: 'weight' as MeasurementUnitFamily,
-  displayOrder: 0,
-  isActive: true,
-})
-
-const confirm = reactive({ show: false, id: '', name: '', loading: false })
-
-function normalizeCode(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-}
-
-async function load() {
-  measurementUnits.value = null
-  try {
+const { items: measurementUnits, loading: tableLoading, load } = useResourceList<MeasurementUnit>(
+  async () => {
     const data = await measurementUnitsService.list()
-    measurementUnits.value = [...data].sort((a, b) => {
-      if (a.family !== b.family) {
-        return a.family.localeCompare(b.family, 'es')
-      }
-      if (a.displayOrder !== b.displayOrder) {
-        return a.displayOrder - b.displayOrder
-      }
+    return [...data].sort((a, b) => {
+      if (a.family !== b.family) return a.family.localeCompare(b.family, 'es')
+      if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder
       return a.label.localeCompare(b.label, 'es')
     })
-  } catch {
-    measurementUnits.value = []
-    toast.error('Error', 'No se pudieron cargar los tipos de medida')
-  }
+  },
+  'No se pudieron cargar los tipos de medida',
+)
+
+function normalizeCode(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, '-')
 }
 
-function openCreate() {
-  formModal.isEdit = false
-  formModal.id = ''
-  formModal.code = ''
-  formModal.label = ''
-  formModal.family = 'weight'
-  formModal.displayOrder = 0
-  formModal.isActive = true
-  formModal.show = true
-}
+type MeasurementUnitForm = { code: string; label: string; family: MeasurementUnitFamily; displayOrder: number; isActive: boolean }
 
-function openEdit(unit: MeasurementUnit) {
-  formModal.isEdit = true
-  formModal.id = unit.id
-  formModal.code = unit.code
-  formModal.label = unit.label
-  formModal.family = unit.family
-  formModal.displayOrder = Number(unit.displayOrder ?? 0)
-  formModal.isActive = unit.isActive
-  formModal.show = true
-}
-
-async function saveMeasurementUnit() {
-  formModal.loading = true
-  try {
-    const payload = {
-      code: normalizeCode(formModal.code),
-      label: formModal.label.trim(),
-      family: formModal.family,
-      displayOrder: Number(formModal.displayOrder),
-      isActive: formModal.isActive,
-    }
-
-    if (formModal.isEdit) {
-      await measurementUnitsService.update(formModal.id, payload)
-      toast.success('Tipo de medida actualizado')
-    } else {
-      await measurementUnitsService.create(payload)
-      toast.success('Tipo de medida creado')
-    }
-
-    formModal.show = false
-    await load()
-  } catch (error) {
-    toast.error('Error', extractErrorMessage(error, 'No se pudo guardar el tipo de medida'))
-  } finally {
-    formModal.loading = false
-  }
-}
-
-function askDelete(unit: MeasurementUnit) {
-  confirm.id = unit.id
-  confirm.name = unit.label
-  confirm.show = true
-}
-
-async function removeMeasurementUnit() {
-  confirm.loading = true
-  try {
-    await measurementUnitsService.remove(confirm.id)
-    toast.success('Tipo de medida eliminado')
-    confirm.show = false
-    await load()
-  } catch (error) {
-    toast.error('Error', extractErrorMessage(error, 'No se pudo eliminar el tipo de medida'))
-  } finally {
-    confirm.loading = false
-  }
-}
+const {
+  formModal,
+  confirm,
+  openCreate,
+  openEdit,
+  save: saveMeasurementUnit,
+  askDelete,
+  confirmDelete: removeMeasurementUnit,
+} = useCrudForm<MeasurementUnit, MeasurementUnitForm>({
+  service: measurementUnitsService,
+  entityName: 'Tipo de medida',
+  formDefaults: () => ({ code: '', label: '', family: 'weight' as MeasurementUnitFamily, displayOrder: 0, isActive: true }),
+  fillForm: (form, unit) => {
+    form.code = unit.code
+    form.label = unit.label
+    form.family = unit.family
+    form.displayOrder = Number(unit.displayOrder ?? 0)
+    form.isActive = unit.isActive
+  },
+  buildPayload: (form) => ({
+    code: normalizeCode(form.code),
+    label: form.label.trim(),
+    family: form.family,
+    displayOrder: Number(form.displayOrder),
+    isActive: form.isActive,
+  }),
+  getDeleteName: (unit) => unit.label,
+  onSuccess: load,
+})
 
 onMounted(load)
 </script>

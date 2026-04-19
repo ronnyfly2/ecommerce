@@ -444,6 +444,7 @@ onMounted(async () => {
           </UiBadge>
         </div>
       </div>
+      </div>
     </UiCard>
 
     <UiCard title="Sesiones activas">

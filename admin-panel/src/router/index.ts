@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import { hasAccessToken } from '@/services/http'
 import { Role } from '@/types/api'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
+import UsersView from '@/views/users/UsersView.vue'
 import { preloadRichEditor } from '@/utils/preload-rich-editor'
 import {
   BACKOFFICE_ROLES,
@@ -140,7 +141,7 @@ const router = createRouter({
         {
           path: 'users',
           name: 'users',
-          component: () => import('@/views/users/UsersView.vue'),
+          component: UsersView,
           meta: { title: 'Usuarios', roles: USER_READ_ROLES },
         },
 

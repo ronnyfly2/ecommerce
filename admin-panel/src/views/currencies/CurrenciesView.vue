@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import { currenciesService } from '@/services/currencies.service'
 import type { Currency } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
@@ -15,119 +15,51 @@ import FormModalActions from '@/components/forms/FormModalActions.vue'
 import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
-import { useToast } from '@/composables/useToast'
+import { useResourceList } from '@/composables/useResourceList'
+import { useCrudForm } from '@/composables/useCrudForm'
 import { setSystemCurrencyFromList } from '@/utils/system-currency'
 
-const toast = useToast()
-const currencies = ref<Currency[] | null>(null)
-const tableLoading = computed(() => currencies.value === null)
-
-const formModal = reactive({
-  show: false,
-  loading: false,
-  isEdit: false,
-  id: '',
-  code: '',
-  name: '',
-  symbol: '',
-  exchangeRateToUsd: 1,
-  isActive: true,
-  isDefault: false,
-})
-
-const confirm = reactive({ show: false, id: '', code: '', loading: false })
+const { items: currencies, loading: tableLoading, load } = useResourceList<Currency>(
+  async () => {
+    const data = await currenciesService.list()
+    setSystemCurrencyFromList(data)
+    return data
+  },
+  'No se pudieron cargar las monedas',
+)
 
 function normalizeCode(value: string) {
   return value.trim().toUpperCase()
 }
 
-async function load() {
-  currencies.value = null
-  try {
-    currencies.value = await currenciesService.list()
-    setSystemCurrencyFromList(currencies.value)
-  } catch {
-    currencies.value = []
-    toast.error('Error', 'No se pudieron cargar las monedas')
-  }
-}
+type CurrencyForm = { code: string; name: string; symbol: string; exchangeRateToUsd: number; isActive: boolean; isDefault: boolean }
 
-function resetForm() {
-  formModal.isEdit = false
-  formModal.id = ''
-  formModal.code = ''
-  formModal.name = ''
-  formModal.symbol = ''
-  formModal.exchangeRateToUsd = 1
-  formModal.isActive = true
-  formModal.isDefault = false
-}
-
-function openCreate() {
-  resetForm()
-  formModal.show = true
-}
-
-function openEdit(currency: Currency) {
-  formModal.isEdit = true
-  formModal.id = currency.id
-  formModal.code = currency.code
-  formModal.name = currency.name
-  formModal.symbol = currency.symbol
-  formModal.exchangeRateToUsd = Number(currency.exchangeRateToUsd)
-  formModal.isActive = currency.isActive
-  formModal.isDefault = currency.isDefault
-  formModal.show = true
-}
-
-async function saveCurrency() {
-  formModal.loading = true
-  try {
-    const payload = {
-      code: normalizeCode(formModal.code),
-      name: formModal.name.trim(),
-      symbol: formModal.symbol.trim(),
-      exchangeRateToUsd: Number(formModal.exchangeRateToUsd),
-      isActive: formModal.isActive,
-      isDefault: formModal.isDefault,
-    }
-
-    if (formModal.isEdit) {
-      await currenciesService.update(formModal.id, payload)
-      toast.success('Moneda actualizada')
-    } else {
-      await currenciesService.create(payload)
-      toast.success('Moneda creada')
-    }
-
-    formModal.show = false
-    await load()
-  } catch {
-    toast.error('Error', 'No se pudo guardar la moneda')
-  } finally {
-    formModal.loading = false
-  }
-}
-
-function askDelete(currency: Currency) {
-  confirm.id = currency.id
-  confirm.code = currency.code
-  confirm.show = true
-}
-
-async function removeCurrency() {
-  confirm.loading = true
-  try {
-    await currenciesService.remove(confirm.id)
-    toast.success('Moneda eliminada')
-    confirm.show = false
-    await load()
-  } catch {
-    toast.error('Error', 'No se pudo eliminar la moneda')
-  } finally {
-    confirm.loading = false
-  }
-}
+const { formModal, confirm, openCreate, openEdit, save: saveCurrency, askDelete, confirmDelete: removeCurrency } = useCrudForm<
+  Currency,
+  CurrencyForm
+>({
+  service: currenciesService,
+  entityName: 'Moneda',
+  formDefaults: () => ({ code: '', name: '', symbol: '', exchangeRateToUsd: 1, isActive: true, isDefault: false }),
+  fillForm: (form, currency) => {
+    form.code = currency.code
+    form.name = currency.name
+    form.symbol = currency.symbol
+    form.exchangeRateToUsd = Number(currency.exchangeRateToUsd)
+    form.isActive = currency.isActive
+    form.isDefault = currency.isDefault
+  },
+  buildPayload: (form) => ({
+    code: normalizeCode(form.code),
+    name: form.name.trim(),
+    symbol: form.symbol.trim(),
+    exchangeRateToUsd: Number(form.exchangeRateToUsd),
+    isActive: form.isActive,
+    isDefault: form.isDefault,
+  }),
+  getDeleteName: (currency) => currency.code,
+  onSuccess: load,
+})
 
 onMounted(load)
 </script>
@@ -227,7 +159,7 @@ onMounted(load)
     <UiConfirm
       :show="confirm.show"
       title="Eliminar moneda"
-      :message="`¿Eliminar la moneda ${confirm.code}?`"
+      :message="`¿Eliminar la moneda ${confirm.name}?`"
       :loading="confirm.loading"
       @confirm="removeCurrency"
       @cancel="confirm.show = false"

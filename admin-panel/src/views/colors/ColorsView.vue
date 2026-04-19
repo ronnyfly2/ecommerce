@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import { colorsService } from '@/services/catalog.service'
 import type { Color } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
@@ -18,96 +18,30 @@ import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
-import { useToast } from '@/composables/useToast'
+import { useResourceList } from '@/composables/useResourceList'
+import { useCrudForm } from '@/composables/useCrudForm'
 
-const toast = useToast()
-const colors = ref<Color[] | null>(null)
-const tableLoading = computed(() => colors.value === null)
+const { items: colors, loading: tableLoading, load } = useResourceList<Color>(
+  () => colorsService.list(),
+  'No se pudieron cargar los colores',
+)
 
-const formModal = reactive({
-  show: false,
-  loading: false,
-  isEdit: false,
-  id: '',
-  name: '',
-  hexCode: '#000000',
-  isActive: true,
+const { formModal, confirm, openCreate, openEdit, save: saveColor, askDelete, confirmDelete: removeColor } = useCrudForm<
+  Color,
+  { name: string; hexCode: string; isActive: boolean }
+>({
+  service: colorsService,
+  entityName: 'Color',
+  formDefaults: () => ({ name: '', hexCode: '#000000', isActive: true }),
+  fillForm: (form, color) => {
+    form.name = color.name
+    form.hexCode = color.hexCode
+    form.isActive = color.isActive
+  },
+  buildPayload: (form) => ({ name: form.name, hexCode: form.hexCode, isActive: form.isActive }),
+  getDeleteName: (color) => color.name,
+  onSuccess: load,
 })
-const confirm = reactive({ show: false, id: '', name: '', loading: false })
-
-async function load() {
-  colors.value = null
-  try {
-    colors.value = await colorsService.list()
-  } catch {
-    colors.value = []
-    toast.error('Error', 'No se pudieron cargar los colores')
-  }
-}
-
-function openCreate() {
-  formModal.isEdit = false
-  formModal.id = ''
-  formModal.name = ''
-  formModal.hexCode = '#000000'
-  formModal.isActive = true
-  formModal.show = true
-}
-
-function openEdit(color: Color) {
-  formModal.isEdit = true
-  formModal.id = color.id
-  formModal.name = color.name
-  formModal.hexCode = color.hexCode
-  formModal.isActive = color.isActive
-  formModal.show = true
-}
-
-async function saveColor() {
-  formModal.loading = true
-  try {
-    const payload = {
-      name: formModal.name,
-      hexCode: formModal.hexCode,
-      isActive: formModal.isActive,
-    }
-
-    if (formModal.isEdit) {
-      await colorsService.update(formModal.id, payload)
-      toast.success('Color actualizado')
-    } else {
-      await colorsService.create(payload)
-      toast.success('Color creado')
-    }
-
-    formModal.show = false
-    await load()
-  } catch {
-    toast.error('Error', 'No se pudo guardar el color')
-  } finally {
-    formModal.loading = false
-  }
-}
-
-function askDelete(color: Color) {
-  confirm.id = color.id
-  confirm.name = color.name
-  confirm.show = true
-}
-
-async function removeColor() {
-  confirm.loading = true
-  try {
-    await colorsService.remove(confirm.id)
-    toast.success('Color eliminado')
-    confirm.show = false
-    await load()
-  } catch {
-    toast.error('Error', 'No se pudo eliminar el color')
-  } finally {
-    confirm.loading = false
-  }
-}
 
 onMounted(load)
 </script>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { onMounted } from 'vue'
 import { tagsService } from '@/services/catalog.service'
-import { extractErrorMessage } from '@/utils/error'
 import type { Tag } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiButton from '@/components/ui/UiButton.vue'
@@ -18,87 +17,29 @@ import FormModalActions from '@/components/forms/FormModalActions.vue'
 import FormModalLayout from '@/components/forms/FormModalLayout.vue'
 import FormToggleField from '@/components/forms/FormToggleField.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
-import { useToast } from '@/composables/useToast'
+import { useResourceList } from '@/composables/useResourceList'
+import { useCrudForm } from '@/composables/useCrudForm'
 
-const toast = useToast()
-const tags = ref<Tag[] | null>(null)
-const tableLoading = computed(() => tags.value === null)
+const { items: tags, loading: tableLoading, load } = useResourceList<Tag>(
+  () => tagsService.list(),
+  'No se pudieron cargar los tags',
+)
 
-const formModal = reactive({
-  show: false,
-  loading: false,
-  isEdit: false,
-  id: '',
-  name: '',
-  isActive: true,
+const { formModal, confirm, openCreate, openEdit, save: saveTag, askDelete, confirmDelete: removeTag } = useCrudForm<
+  Tag,
+  { name: string; isActive: boolean }
+>({
+  service: tagsService,
+  entityName: 'Tag',
+  formDefaults: () => ({ name: '', isActive: true }),
+  fillForm: (form, tag) => {
+    form.name = tag.name
+    form.isActive = tag.isActive
+  },
+  buildPayload: (form) => ({ name: form.name, isActive: form.isActive }),
+  getDeleteName: (tag) => tag.name,
+  onSuccess: load,
 })
-
-const confirm = reactive({ show: false, id: '', name: '', loading: false })
-
-async function load() {
-  tags.value = null
-  try {
-    tags.value = await tagsService.list()
-  } catch {
-    tags.value = []
-    toast.error('Error', 'No se pudieron cargar los tags')
-  }
-}
-
-function openCreate() {
-  formModal.isEdit = false
-  formModal.id = ''
-  formModal.name = ''
-  formModal.isActive = true
-  formModal.show = true
-}
-
-function openEdit(tag: Tag) {
-  formModal.isEdit = true
-  formModal.id = tag.id
-  formModal.name = tag.name
-  formModal.isActive = tag.isActive
-  formModal.show = true
-}
-
-async function saveTag() {
-  formModal.loading = true
-  try {
-    if (formModal.isEdit) {
-      await tagsService.update(formModal.id, { name: formModal.name, isActive: formModal.isActive })
-      toast.success('Tag actualizado')
-    } else {
-      await tagsService.create({ name: formModal.name, isActive: formModal.isActive })
-      toast.success('Tag creado')
-    }
-    formModal.show = false
-    await load()
-  } catch (e) {
-    toast.error('Error', extractErrorMessage(e, 'No se pudo guardar'))
-  } finally {
-    formModal.loading = false
-  }
-}
-
-function askDelete(tag: Tag) {
-  confirm.id = tag.id
-  confirm.name = tag.name
-  confirm.show = true
-}
-
-async function removeTag() {
-  confirm.loading = true
-  try {
-    await tagsService.remove(confirm.id)
-    toast.success('Tag eliminado')
-    confirm.show = false
-    await load()
-  } catch (e) {
-    toast.error('Error', extractErrorMessage(e, 'No se pudo eliminar'))
-  } finally {
-    confirm.loading = false
-  }
-}
 
 onMounted(load)
 </script>
