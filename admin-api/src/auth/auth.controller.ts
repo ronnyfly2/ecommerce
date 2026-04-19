@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   Req,
   Res,
@@ -19,6 +20,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RevokeSessionDto } from './dto/revoke-session.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -143,6 +145,12 @@ export class AuthController {
   @Get('me')
   me(@GetUser('id') userId: string) {
     return this.authService.me(userId);
+  }
+
+  @ApiBearerAuth()
+  @Patch('me')
+  updateMe(@GetUser('id') userId: string, @Body() dto: UpdateProfileDto) {
+    return this.authService.updateProfile(userId, dto);
   }
 
   @Public()

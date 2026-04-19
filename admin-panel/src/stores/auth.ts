@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { authService } from '@/services/auth.service'
 import { clearTokens } from '@/services/http'
 import { useNotificationsStore } from '@/stores/notifications'
-import type { User, LoginDto } from '@/types/api'
+import type { User, LoginDto, RegisterDto, UpdateProfileDto } from '@/types/api'
 import { Role } from '@/types/api'
 import { hasRolePermission, hasRouteAccess, type PermissionKey } from '@/utils/permissions'
 
@@ -35,6 +35,25 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const { user: me } = await authService.login(dto)
+      if (me.role !== Role.SUPER_ADMIN) {
+        await authService.logout()
+        throw new Error('Solo usuarios SUPERADMIN_USER pueden ingresar')
+      }
+      notifications.reset()
+      user.value = me
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function register(dto: RegisterDto) {
+    loading.value = true
+    try {
+      const { user: me } = await authService.register(dto)
+      if (me.role !== Role.SUPER_ADMIN) {
+        await authService.logout()
+        throw new Error('El registro debe crear un usuario SUPERADMIN_USER')
+      }
       notifications.reset()
       user.value = me
     } finally {
@@ -59,6 +78,12 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
+  async function updateProfile(dto: UpdateProfileDto) {
+    const updated = await authService.updateMe(dto)
+    user.value = updated
+    return updated
+  }
+
   function reset() {
     notifications.reset()
     user.value = null
@@ -73,5 +98,23 @@ export const useAuthStore = defineStore('auth', () => {
     return hasRouteAccess(currentRole.value, roles)
   }
 
-  return { user, loading, initialized, isAuthenticated, currentRole, isSuperAdmin, isBoss, isAdmin, fullName, login, fetchMe, logout, reset, can, canAccessRoles }
+  return {
+    user,
+    loading,
+    initialized,
+    isAuthenticated,
+    currentRole,
+    isSuperAdmin,
+    isBoss,
+    isAdmin,
+    fullName,
+    login,
+    register,
+    fetchMe,
+    logout,
+    updateProfile,
+    reset,
+    can,
+    canAccessRoles,
+  }
 })

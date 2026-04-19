@@ -16,6 +16,7 @@ const toast  = useToast()
 const form = reactive({ email: '', password: '' })
 const error = ref('')
 const showSeedButtons = import.meta.env.DEV
+const deniedByRole = route.query.reason === 'role-not-allowed'
 
 const seedCredentials = {
   superAdminEmail: import.meta.env.VITE_SEED_SUPER_ADMIN_EMAIL || 'superadmin@local.dev',
@@ -65,6 +66,10 @@ async function submit() {
 
       <!-- Card -->
       <div class="card p-6 space-y-4">
+        <div v-if="deniedByRole" class="text-sm text-warning-800 bg-warning-50 rounded-lg px-3 py-2" role="alert">
+          Solo usuarios con rol SUPERADMIN_USER pueden ingresar a este panel.
+        </div>
+
         <div v-if="showSeedButtons" class="rounded-lg border border-surface-200 bg-surface-50 p-3">
           <p class="text-caption mb-2">Acceso rapido con seed (desarrollo)</p>
           <div class="flex flex-col sm:flex-row gap-2">
@@ -134,6 +139,17 @@ async function submit() {
           >
             {{ auth.loading ? 'Ingresando…' : 'Ingresar' }}
           </UiButton>
+
+          <p class="text-sm text-center text-muted">
+            ¿No tienes cuenta?
+            <button
+              type="button"
+              class="font-medium text-primary-700 hover:text-primary-800"
+              @click="router.push({ name: 'register' })"
+            >
+              Regístrate como SUPERADMIN_USER
+            </button>
+          </p>
         </form>
       </div>
     </div>

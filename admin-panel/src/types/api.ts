@@ -130,6 +130,13 @@ export interface RegisterDto {
   password: string
   firstName?: string
   lastName?: string
+  role?: Role | 'SUPERADMIN_USER'
+}
+
+export interface UpdateProfileDto {
+  firstName?: string
+  lastName?: string
+  avatar?: string
 }
 
 export interface ForgotPasswordDto {

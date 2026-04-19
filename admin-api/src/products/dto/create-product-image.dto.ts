@@ -6,7 +6,7 @@ export class CreateProductImageDto {
     example: 'http://localhost:3000/uploads/1742299999999-123456789.jpg',
   })
   @IsString()
-  @IsUrl({ require_tld: false })
+  @IsUrl({ require_tld: false, require_host: false, require_protocol: false })
   url: string;
 
   @ApiPropertyOptional({ example: 'Frente del producto' })

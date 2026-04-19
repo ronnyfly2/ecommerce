@@ -12,6 +12,7 @@ import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { PasswordResetMailService } from './services/password-reset-mail.service';
@@ -21,6 +22,8 @@ type AuthRequestContext = {
   ipAddress: string;
   userAgent: string | null;
 };
+
+const SUPERADMIN_USER_ALIAS = 'SUPERADMIN_USER';
 
 @Injectable()
 export class AuthService {
@@ -55,7 +58,7 @@ export class AuthService {
       passwordHash,
       firstName: dto.firstName ?? null,
       lastName: dto.lastName ?? null,
-      role: Role.CUSTOMER,
+      role: this.resolveRegisterRole(dto.role),
     });
 
     const savedUser = await this.usersRepository.save(user);
@@ -336,6 +339,33 @@ export class AuthService {
     return safeUser;
   }
 
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (dto.firstName !== undefined) {
+      const firstName = dto.firstName.trim();
+      user.firstName = firstName.length > 0 ? firstName : null;
+    }
+
+    if (dto.lastName !== undefined) {
+      const lastName = dto.lastName.trim();
+      user.lastName = lastName.length > 0 ? lastName : null;
+    }
+
+    if (dto.avatar !== undefined) {
+      const avatar = dto.avatar?.trim() ?? '';
+      user.avatar = avatar.length > 0 ? avatar : null;
+    }
+
+    const saved = await this.usersRepository.save(user);
+    const { passwordHash, ...safeUser } = saved;
+    return safeUser;
+  }
+
   private async buildAuthResponse(user: User, requestContext: AuthRequestContext) {
     const { accessToken, refreshToken } = await this.issueTokenPair(user, requestContext);
 
@@ -431,5 +461,19 @@ export class AuthService {
     }
 
     return userAgent.length > 120 ? `${userAgent.slice(0, 117)}...` : userAgent;
+  }
+
+  private resolveRegisterRole(role?: Role | 'SUPERADMIN_USER'): Role {
+    if (!role) {
+      return Role.CUSTOMER;
+    }
+
+    if (role === SUPERADMIN_USER_ALIAS || role === Role.SUPER_ADMIN) {
+      return Role.SUPER_ADMIN;
+    }
+
+    throw new BadRequestException(
+      'Only SUPERADMIN_USER or SUPER_ADMIN are allowed for public register role',
+    );
   }
 }

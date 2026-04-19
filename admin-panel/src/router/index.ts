@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { hasAccessToken } from '@/services/http'
-import type { Role } from '@/types/api'
+import { Role } from '@/types/api'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
 import { preloadRichEditor } from '@/utils/preload-rich-editor'
 import {
@@ -26,6 +26,12 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/views/auth/LoginView.vue'),
+      meta: { public: true, layout: 'auth' },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/auth/RegisterView.vue'),
       meta: { public: true, layout: 'auth' },
     },
     {
@@ -225,12 +231,17 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
+  if (!isPublicRoute && auth.isAuthenticated && auth.currentRole !== Role.SUPER_ADMIN) {
+    await auth.logout()
+    return { name: 'login', query: { reason: 'role-not-allowed' } }
+  }
+
   const requiredRoles = to.meta.roles as readonly Role[] | undefined
   if (!isPublicRoute && requiredRoles && !auth.canAccessRoles(requiredRoles)) {
     return { name: 'dashboard' }
   }
 
-  const authPublicPages = new Set(['login', 'forgot-password', 'reset-password'])
+  const authPublicPages = new Set(['login', 'register', 'forgot-password', 'reset-password'])
   if (to.name && authPublicPages.has(String(to.name)) && auth.isAuthenticated) {
     return { name: 'dashboard' }
   }

@@ -1627,7 +1627,7 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
       <div class="xl:col-span-2 space-y-6">
         <UiCard :title="isEdit ? 'Editar producto' : 'Nuevo producto'">
-          <form class="space-y-6" @submit.prevent="save">
+          <form class="space-y-6 p-4" @submit.prevent="save">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <UiInput
                 v-model="form.name"
@@ -2425,9 +2425,9 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
           </form>
         </UiCard>
 
-        <UiCard v-if="isEdit && product" title="Versiones vinculadas">
+        <UiCard  v-if="isEdit && product" title="Versiones vinculadas">
           <template #default>
-            <div class="-mx-6 -mb-6">
+            <div class="p-4">
               <UiTable :data="selectedVariantProducts" :columns="variantProductsColumns" compact :empty="!selectedVariantProducts.length" empty-message="No hay variantes vinculadas">
 
                 <tr v-for="variantProduct in selectedVariantProducts" :key="variantProduct.id" class="table-tr-hover">
@@ -2475,7 +2475,7 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
 
       <div class="space-y-6">
         <UiCard title="Estado del formulario">
-          <div class="space-y-3 text-sm">
+          <div class="space-y-3 text-sm p-4">
             <div class="flex items-center justify-between">
               <span class="text-surface-600">Nombre</span>
               <UiBadge :color="form.name.trim().length >= 3 ? 'success' : 'warning'" dot>
@@ -2508,11 +2508,11 @@ function fmt(n: number | string, currencyCode = form.currencyCode || getSystemCu
         </UiCard>
 
         <UiCard title="Imagenes del producto">
-          <div v-if="!isEdit || !product" class="text-sm text-surface-600">
+          <div v-if="!isEdit || !product" class="text-sm text-surface-600 p-4">
             Este bloque se habilita cuando el producto ya fue creado.
           </div>
 
-          <div v-else class="space-y-4">
+          <div v-else class="space-y-4 p-4">
             <UiFileInput multiple accept="image/*" size="lg" label="Imágenes" @change="onImageFileSelected" />
             <FormToggleField v-model="imageUpload.markFirstAsMain" label="Marcar la primera como principal" size="lg" />
 

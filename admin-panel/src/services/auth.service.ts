@@ -4,8 +4,10 @@ import type {
   ForgotPasswordDto,
   LoginDto,
   LoginResponse,
+  RegisterDto,
   RefreshTokenRecord,
   ResetPasswordDto,
+  UpdateProfileDto,
   User,
 } from '@/types/api'
 
@@ -17,9 +19,30 @@ export const authService = {
     return { accessToken, user }
   },
 
+  async register(dto: RegisterDto) {
+    const res = await http.post<ApiResponse<LoginResponse>>('/auth/register', dto)
+    const { accessToken, user } = res.data.data
+    setAccessToken(accessToken)
+    return { accessToken, user }
+  },
+
   async me() {
     const res = await http.get<ApiResponse<User>>('/auth/me')
     return res.data.data
+  },
+
+  async updateMe(dto: UpdateProfileDto) {
+    const res = await http.patch<ApiResponse<User>>('/auth/me', dto)
+    return res.data.data
+  },
+
+  async uploadAvatar(file: File) {
+    const form = new FormData()
+    form.append('image', file)
+    const res = await http.post<ApiResponse<{ url: string; filename: string }>>('/images/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data.data.url
   },
 
   async logout() {

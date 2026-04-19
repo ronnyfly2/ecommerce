@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/services/auth.service'
@@ -45,6 +45,32 @@ const pendingDestructiveAction = ref<
   'clean-seed-force' | 'clean-users-all' | 'clean-all' | null
 >(null)
 const confirmKeyword = 'CONFIRMAR'
+const savingProfile = ref(false)
+const uploadingAvatar = ref(false)
+const profileForm = reactive({
+  firstName: '',
+  lastName: '',
+  avatar: '',
+})
+
+const profileInitials = computed(() => {
+  const parts = [profileForm.firstName, profileForm.lastName]
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  if (!parts.length) {
+    return (auth.user?.email?.[0] ?? '?').toUpperCase()
+  }
+
+  return parts.slice(0, 2).map((part) => part[0].toUpperCase()).join('')
+})
+
+const profileAvatarPreview = computed(() => {
+  if (profileForm.avatar.trim()) {
+    return profileForm.avatar.trim()
+  }
+  return auth.user?.avatar ?? ''
+})
 
 const seedModeLabel = computed(() => {
   const mode = seedActionResult.value?.mode
@@ -307,13 +333,98 @@ async function logoutAll() {
   }
 }
 
-onMounted(loadSessions)
+function hydrateProfileForm() {
+  profileForm.firstName = auth.user?.firstName ?? ''
+  profileForm.lastName = auth.user?.lastName ?? ''
+  profileForm.avatar = auth.user?.avatar ?? ''
+}
+
+async function saveProfile() {
+  savingProfile.value = true
+  try {
+    await auth.updateProfile({
+      firstName: profileForm.firstName,
+      lastName: profileForm.lastName,
+      avatar: profileForm.avatar,
+    })
+    toast.success('Perfil actualizado')
+    hydrateProfileForm()
+  } catch (error) {
+    toast.error('Error', extractErrorMessage(error, 'No se pudo actualizar el perfil'))
+  } finally {
+    savingProfile.value = false
+  }
+}
+
+async function onAvatarSelected(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  uploadingAvatar.value = true
+  try {
+    const avatarUrl = await authService.uploadAvatar(file)
+    profileForm.avatar = avatarUrl
+    toast.success('Avatar cargado', 'Recuerda guardar cambios')
+  } catch (error) {
+    toast.error('Error', extractErrorMessage(error, 'No se pudo subir la imagen'))
+  } finally {
+    uploadingAvatar.value = false
+    target.value = ''
+  }
+}
+
+onMounted(async () => {
+  await loadSessions()
+  hydrateProfileForm()
+})
 </script>
 
 <template>
   <div class="space-y-6">
     <UiCard title="Mi perfil">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
+        <div class="lg:col-span-1">
+          <p class="text-caption mb-2">Avatar</p>
+          <div class="flex items-center gap-3">
+            <img
+              v-if="profileAvatarPreview"
+              :src="profileAvatarPreview"
+              alt="Avatar"
+              class="h-16 w-16 rounded-full object-cover border border-surface-200"
+            />
+            <div
+              v-else
+              class="h-16 w-16 rounded-full bg-primary-100 text-primary-700 border border-primary-200 flex items-center justify-center text-lg font-semibold"
+            >
+              {{ profileInitials }}
+            </div>
+            <div class="space-y-2">
+              <input
+                type="file"
+                accept="image/*"
+                class="block text-xs text-surface-600"
+                :disabled="uploadingAvatar"
+                @change="onAvatarSelected"
+              />
+              <UiButton size="sm" variant="ghost" :loading="uploadingAvatar" @click="profileForm.avatar = ''">
+                Usar inicial
+              </UiButton>
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <UiInput v-model="profileForm.firstName" label="Nombre" />
+          <UiInput v-model="profileForm.lastName" label="Apellido" />
+          <UiInput v-model="profileForm.avatar" class="sm:col-span-2" label="URL de avatar (opcional)" />
+        </div>
+
+        <div class="lg:col-span-3 flex justify-end">
+          <UiButton :loading="savingProfile" @click="saveProfile">Guardar perfil</UiButton>
+        </div>
+
+        <div class="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <p class="text-caption mb-1">Nombre</p>
           <p class="font-medium text-surface-900">{{ auth.fullName || '—' }}</p>

@@ -72,10 +72,10 @@ export const productsService = {
   async uploadImageAsset(file: File) {
     const form = new FormData()
     form.append('image', file)
-    const res = await http.post<ApiResponse<string>>('/images/upload', form, {
+    const res = await http.post<ApiResponse<{ url: string; filename: string }>>('/images/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    return res.data.data
+    return res.data.data.url
   },
 
   async createImage(productId: string, dto: CreateProductImageDto) {
