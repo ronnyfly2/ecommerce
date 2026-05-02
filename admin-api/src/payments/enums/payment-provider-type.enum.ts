@@ -1,0 +1,5 @@
+export enum PaymentProviderType {
+  MANUAL_TRANSFER = 'MANUAL_TRANSFER',
+  STRIPE = 'STRIPE',
+  CASH_ON_DELIVERY = 'CASH_ON_DELIVERY',
+}

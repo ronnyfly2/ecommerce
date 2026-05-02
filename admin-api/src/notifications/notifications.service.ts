@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -6,12 +6,12 @@ import { Role } from '../common/enums/role.enum';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { User } from '../users/entities/user.entity';
-import { MAIL_PROVIDER_TOKEN } from './notifications.constants';
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
 import { NotificationType } from './enums/notification-type.enum';
 import { Notification } from './entities/notification.entity';
 import { NotificationsGateway } from './notifications.gateway';
-import type { MailMessage, MailProvider } from './notifications.types';
+import { EmailTemplateKey } from './templates/enums/template-key.enum';
+import { MailService } from './templates/mail.service';
 
 @Injectable()
 export class NotificationsService {
@@ -22,8 +22,7 @@ export class NotificationsService {
     private readonly notificationsRepository: Repository<Notification>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
-    @Inject(MAIL_PROVIDER_TOKEN)
-    private readonly mailProvider: MailProvider,
+    private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly notificationsGateway: NotificationsGateway,
   ) {}
@@ -199,82 +198,250 @@ export class NotificationsService {
     }
 
     const appUrl = this.configService.get<string>('APP_URL')?.trim() || 'http://localhost:5173';
-    const customerName = [order.user.firstName, order.user.lastName]
-      .filter(Boolean)
-      .join(' ')
-      .trim() || order.user.email;
+    const customerName = this.getUserDisplayName(order.user);
     const orderCode = order.id.slice(0, 8).toUpperCase();
-    const itemsHtml = order.items
-      .map((item) => {
-        const productName = item.variant?.product?.name ?? item.variant?.sku ?? 'Producto';
-        return `<li>${productName} x ${item.quantity} - ${this.formatCurrency(item.subtotal, order.currencyCode)}</li>`;
-      })
-      .join('');
-    const itemsText = order.items
-      .map((item) => {
-        const productName = item.variant?.product?.name ?? item.variant?.sku ?? 'Producto';
-        return `- ${productName} x ${item.quantity} - ${this.formatCurrency(item.subtotal, order.currencyCode)}`;
-      })
-      .join('\n');
+    const items = order.items.map((item) => ({
+      name: item.variant?.product?.name ?? item.variant?.sku ?? 'Producto',
+      quantity: item.quantity,
+      subtotal: Number(item.subtotal),
+    }));
 
-    try {
-      await this.mailProvider.send({
-        to: order.user.email,
-        subject: `Confirmacion de orden #${orderCode}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #111827;">
-            <h1 style="font-size: 24px; margin-bottom: 16px;">Tu orden fue recibida</h1>
-            <p>Hola ${this.escapeHtml(customerName)},</p>
-            <p>Recibimos tu orden <strong>#${orderCode}</strong> y ya la estamos procesando.</p>
-            <p><strong>Total:</strong> ${this.formatCurrency(order.total, order.currencyCode)}</p>
-            <h2 style="font-size: 18px; margin-top: 24px;">Items</h2>
-            <ul>${itemsHtml}</ul>
-            <p style="margin-top: 24px;">Puedes revisar el estado desde tu panel: <a href="${appUrl}/orders/${order.id}">${appUrl}/orders/${order.id}</a></p>
-          </div>
-        `,
-        text: [
-          `Hola ${customerName},`,
-          '',
-          `Recibimos tu orden #${orderCode}.`,
-          `Total: ${this.formatCurrency(order.total, order.currencyCode)}`,
-          '',
-          'Items:',
-          itemsText,
-          '',
-          `Ver orden: ${appUrl}/orders/${order.id}`,
-        ].join('\n'),
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown email error';
-      this.logger.error(`Failed to send order confirmation for order ${order.id}: ${message}`);
-    }
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.ORDER_CONFIRMATION,
+      context: {
+        customerName,
+        orderCode,
+        orderUrl: `${appUrl}/orders/${order.id}`,
+        items,
+        total: Number(order.total),
+        currency: order.currencyCode ?? 'USD',
+      },
+    });
   }
 
-  private formatCurrency(value: string | number, currencyCode = 'USD'): string {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: currencyCode || 'USD',
-      minimumFractionDigits: 2,
-    }).format(Number(value));
+  async sendPasswordResetTemplate(input: {
+    to: string;
+    customerName: string;
+    resetUrl: string;
+    expiresIn: string;
+  }): Promise<void> {
+    await this.mailService.sendTemplate({
+      to: input.to,
+      key: EmailTemplateKey.AUTH_PASSWORD_RESET,
+      context: {
+        customerName: input.customerName,
+        resetUrl: input.resetUrl,
+        expiresIn: input.expiresIn,
+      },
+      throwOnError: true,
+    });
   }
 
-  async sendPasswordResetEmail(message: MailMessage): Promise<void> {
-    try {
-      await this.mailProvider.send(message);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown email error';
-      this.logger.error(`Failed to send password reset email: ${errorMsg}`);
-      throw error;
-    }
+  async sendPaymentReceiptReceived(payment: {
+    order: Order;
+    amount: string;
+    currencyCode: string;
+  }): Promise<void> {
+    const order = payment.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.ORDER_PAYMENT_RECEIPT_RECEIVED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        orderCode: order.id.slice(0, 8).toUpperCase(),
+        orderUrl: `${this.getAppUrl()}/orders/${order.id}`,
+        total: Number(payment.amount),
+        currency: payment.currencyCode,
+      },
+    });
   }
 
-  private escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  async sendPaymentApproved(payment: {
+    order: Order;
+    amount: string;
+    currencyCode: string;
+  }): Promise<void> {
+    const order = payment.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.ORDER_PAYMENT_APPROVED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        orderCode: order.id.slice(0, 8).toUpperCase(),
+        orderUrl: `${this.getAppUrl()}/orders/${order.id}`,
+        total: Number(payment.amount),
+        currency: payment.currencyCode,
+      },
+    });
+  }
+
+  async sendPaymentRejected(payment: {
+    order: Order;
+    rejectionReason: string | null;
+  }): Promise<void> {
+    const order = payment.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.ORDER_PAYMENT_REJECTED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        orderCode: order.id.slice(0, 8).toUpperCase(),
+        orderUrl: `${this.getAppUrl()}/orders/${order.id}`,
+        reason: payment.rejectionReason ?? '',
+      },
+    });
+  }
+
+  async sendShipmentCreated(shipment: {
+    order: Order;
+    carrier: string;
+    trackingNumber: string;
+    trackingUrl: string;
+    estimatedDelivery: string;
+  }): Promise<void> {
+    const order = shipment.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.SHIPMENT_CREATED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        orderCode: order.id.slice(0, 8).toUpperCase(),
+        orderUrl: `${this.getAppUrl()}/orders/${order.id}`,
+        carrier: shipment.carrier,
+        trackingNumber: shipment.trackingNumber,
+        trackingUrl: shipment.trackingUrl,
+        estimatedDelivery: shipment.estimatedDelivery,
+      },
+    });
+  }
+
+  async sendShipmentInTransit(shipment: {
+    order: Order;
+    trackingNumber: string;
+    trackingUrl: string;
+    estimatedDelivery: string;
+  }): Promise<void> {
+    const order = shipment.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.SHIPMENT_IN_TRANSIT,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        orderCode: order.id.slice(0, 8).toUpperCase(),
+        trackingNumber: shipment.trackingNumber,
+        trackingUrl: shipment.trackingUrl,
+        estimatedDelivery: shipment.estimatedDelivery,
+      },
+    });
+  }
+
+  async sendShipmentDelivered(shipment: {
+    order: Order;
+    deliveredAt: string;
+  }): Promise<void> {
+    const order = shipment.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.SHIPMENT_DELIVERED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        orderCode: order.id.slice(0, 8).toUpperCase(),
+        deliveredAt: shipment.deliveredAt,
+        reviewUrl: `${this.getAppUrl()}/orders/${order.id}/reviews`,
+      },
+    });
+  }
+
+  async sendReturnRequested(input: {
+    order: Order;
+    rmaNumber: string;
+    reason: string;
+  }): Promise<void> {
+    const order = input.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.RETURN_REQUESTED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        orderCode: order.id.slice(0, 8).toUpperCase(),
+        returnCode: input.rmaNumber,
+        returnUrl: `${this.getAppUrl()}/returns/${input.rmaNumber}`,
+        reason: input.reason,
+      },
+    });
+  }
+
+  async sendReturnApproved(input: {
+    order: Order;
+    rmaNumber: string;
+    instructions: string;
+  }): Promise<void> {
+    const order = input.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.RETURN_APPROVED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        returnCode: input.rmaNumber,
+        returnUrl: `${this.getAppUrl()}/returns/${input.rmaNumber}`,
+        instructions: input.instructions,
+      },
+    });
+  }
+
+  async sendReturnRejected(input: {
+    order: Order;
+    rmaNumber: string;
+    rejectionReason: string;
+  }): Promise<void> {
+    const order = input.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.RETURN_REJECTED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        returnCode: input.rmaNumber,
+        returnUrl: `${this.getAppUrl()}/returns/${input.rmaNumber}`,
+        reason: input.rejectionReason,
+      },
+    });
+  }
+
+  async sendReturnRefunded(input: {
+    order: Order;
+    rmaNumber: string;
+    refundAmount: string;
+    currencyCode: string;
+    refundMethod: string;
+  }): Promise<void> {
+    const order = input.order;
+    if (!order?.user?.email) return;
+    await this.mailService.sendTemplate({
+      to: order.user.email,
+      key: EmailTemplateKey.RETURN_REFUNDED,
+      context: {
+        customerName: this.getUserDisplayName(order.user),
+        returnCode: input.rmaNumber,
+        returnUrl: `${this.getAppUrl()}/returns/${input.rmaNumber}`,
+        refundAmount: Number(input.refundAmount),
+        currency: input.currencyCode,
+        refundMethod: input.refundMethod,
+      },
+    });
+  }
+
+  private getAppUrl(): string {
+    return this.configService.get<string>('APP_URL')?.trim() || 'http://localhost:5173';
   }
 
   private async notifyAdmins(input: {
@@ -335,5 +502,13 @@ export class NotificationsService {
 
   private getUserDisplayName(user: Pick<User, 'firstName' | 'lastName' | 'email'>): string {
     return [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
+  }
+
+  private formatCurrency(value: string | number, currencyCode = 'USD'): string {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: currencyCode || 'USD',
+      minimumFractionDigits: 2,
+    }).format(Number(value));
   }
 }

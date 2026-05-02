@@ -26,6 +26,8 @@ import { CurrenciesModule } from './currencies/currencies.module';
 import { MeasurementUnitsModule } from './measurement-units/measurement-units.module';
 import { ChatModule } from './chat/chat.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { PaymentsModule } from './payments/payments.module';
+import { ShipmentsModule } from './shipments/shipments.module';
 import { User } from './users/entities/user.entity';
 
 @Module({
@@ -76,6 +78,8 @@ import { User } from './users/entities/user.entity';
     MeasurementUnitsModule,
     ChatModule,
     ReviewsModule,
+    PaymentsModule,
+    ShipmentsModule,
   ],
   controllers: [AppController],
   providers: [

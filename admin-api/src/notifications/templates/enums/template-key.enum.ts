@@ -1,0 +1,17 @@
+export enum EmailTemplateKey {
+  ORDER_CONFIRMATION = 'order.confirmation',
+  ORDER_STATUS_CHANGED = 'order.status-changed',
+  ORDER_PAYMENT_RECEIPT_RECEIVED = 'order.payment-receipt-received',
+  ORDER_PAYMENT_APPROVED = 'order.payment-approved',
+  ORDER_PAYMENT_REJECTED = 'order.payment-rejected',
+  SHIPMENT_CREATED = 'shipment.created',
+  SHIPMENT_IN_TRANSIT = 'shipment.in-transit',
+  SHIPMENT_DELIVERED = 'shipment.delivered',
+  RETURN_REQUESTED = 'return.requested',
+  RETURN_APPROVED = 'return.approved',
+  RETURN_REJECTED = 'return.rejected',
+  RETURN_REFUNDED = 'return.refunded',
+  STOCK_LOW_ALERT = 'stock.low-alert',
+  AUTH_PASSWORD_RESET = 'auth.password-reset',
+  AUTH_WELCOME = 'auth.welcome',
+}

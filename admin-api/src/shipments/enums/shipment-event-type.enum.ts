@@ -1,0 +1,6 @@
+export enum ShipmentEventType {
+  STATUS_CHANGE = 'STATUS_CHANGE',
+  LOCATION_UPDATE = 'LOCATION_UPDATE',
+  NOTE = 'NOTE',
+  EXCEPTION = 'EXCEPTION',
+}

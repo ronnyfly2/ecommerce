@@ -25,6 +25,7 @@ export const envValidationSchema = Joi.object({
   UPLOAD_DIR: Joi.string().default('./uploads'),
   CORS_ORIGIN: Joi.string().optional(),
   APP_URL: Joi.string().uri({ scheme: [/https?/] }).default('http://localhost:5173'),
+  APP_NAME: Joi.string().default('Ecommerce'),
   MAIL_PROVIDER: Joi.string().valid('noop', 'resend').default('noop'),
   MAIL_FROM: Joi.string().optional(),
   RESEND_API_KEY: Joi.string().optional(),

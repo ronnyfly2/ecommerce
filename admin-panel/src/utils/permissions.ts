@@ -16,6 +16,12 @@ export type PermissionKey =
   | 'inventory.manage'
   | 'catalog.manage'
   | 'currencies.manage'
+  | 'payments.view'
+  | 'payments.review'
+  | 'payments.manage'
+  | 'shipments.view'
+  | 'shipments.manage'
+  | 'carriers.manage'
 
 export const BACKOFFICE_ROLES = [
   Role.SUPER_ADMIN,
@@ -99,6 +105,43 @@ export const CURRENCY_MANAGE_ROLES = [
   Role.ADMIN,
 ] as const satisfies readonly UserRole[]
 
+export const PAYMENT_READ_ROLES = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+  Role.BOSS,
+  Role.SALES,
+] as const satisfies readonly UserRole[]
+
+export const PAYMENT_REVIEW_ROLES = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+  Role.SALES,
+] as const satisfies readonly UserRole[]
+
+export const PAYMENT_MANAGE_ROLES = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+] as const satisfies readonly UserRole[]
+
+export const SHIPMENT_READ_ROLES = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+  Role.BOSS,
+  Role.SALES,
+] as const satisfies readonly UserRole[]
+
+export const SHIPMENT_MANAGE_ROLES = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+  Role.BOSS,
+  Role.SALES,
+] as const satisfies readonly UserRole[]
+
+export const CARRIER_MANAGE_ROLES = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+] as const satisfies readonly UserRole[]
+
 const permissionMap: Record<PermissionKey, readonly UserRole[]> = {
   'dashboard.view': BACKOFFICE_ROLES,
   'notifications.view': BACKOFFICE_ROLES,
@@ -115,6 +158,12 @@ const permissionMap: Record<PermissionKey, readonly UserRole[]> = {
   'inventory.manage': INVENTORY_MANAGE_ROLES,
   'catalog.manage': CATALOG_MANAGE_ROLES,
   'currencies.manage': CURRENCY_MANAGE_ROLES,
+  'payments.view': PAYMENT_READ_ROLES,
+  'payments.review': PAYMENT_REVIEW_ROLES,
+  'payments.manage': PAYMENT_MANAGE_ROLES,
+  'shipments.view': SHIPMENT_READ_ROLES,
+  'shipments.manage': SHIPMENT_MANAGE_ROLES,
+  'carriers.manage': CARRIER_MANAGE_ROLES,
 }
 
 export function hasRolePermission(role: UserRole | null | undefined, permission: PermissionKey) {

@@ -1,0 +1,10 @@
+{{#> layout }}
+  <h2 style="margin:0 0 16px;font-size:22px;">Tu pago fue aprobado</h2>
+  <p style="margin:0 0 12px;font-size:14px;line-height:1.6;">Hola {{customerName}},</p>
+  <p style="margin:0 0 12px;font-size:14px;line-height:1.6;">
+    Confirmamos el pago de tu orden <strong>#{{orderCode}}</strong> por
+    <strong>{{formatCurrency total currency}}</strong>. Pronto prepararemos tu envio y te enviaremos
+    el codigo de seguimiento.
+  </p>
+  {{> button url=orderUrl label="Ver mi orden" color="#16a34a" }}
+{{/layout}}

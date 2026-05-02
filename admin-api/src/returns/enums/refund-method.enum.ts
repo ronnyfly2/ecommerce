@@ -1,0 +1,7 @@
+export enum RefundMethod {
+  ORIGINAL = 'ORIGINAL',
+  STORE_CREDIT = 'STORE_CREDIT',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  CASH = 'CASH',
+  OTHER = 'OTHER',
+}

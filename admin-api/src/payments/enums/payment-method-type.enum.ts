@@ -1,0 +1,6 @@
+export enum PaymentMethodType {
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  CREDIT_CARD = 'CREDIT_CARD',
+  CASH = 'CASH',
+  DIGITAL_WALLET = 'DIGITAL_WALLET',
+}

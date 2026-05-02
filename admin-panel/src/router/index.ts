@@ -14,8 +14,12 @@ import {
   INVENTORY_READ_ROLES,
   ORDER_READ_ROLES,
   ORDER_MANAGE_ROLES,
+  PAYMENT_READ_ROLES,
+  PAYMENT_MANAGE_ROLES,
   PRODUCT_MANAGE_ROLES,
   PRODUCT_READ_ROLES,
+  SHIPMENT_READ_ROLES,
+  CARRIER_MANAGE_ROLES,
   USER_READ_ROLES,
 } from '@/utils/permissions'
 
@@ -137,6 +141,40 @@ const router = createRouter({
           meta: { title: 'Cupones', roles: COUPON_READ_ROLES },
         },
 
+        // Pagos
+        {
+          path: 'payments',
+          name: 'payments',
+          component: () => import('@/views/payments/PaymentsView.vue'),
+          meta: { title: 'Pagos', roles: PAYMENT_READ_ROLES },
+        },
+        {
+          path: 'payment-methods',
+          name: 'payment-methods',
+          component: () => import('@/views/payments/PaymentMethodsView.vue'),
+          meta: { title: 'Metodos de pago', roles: PAYMENT_MANAGE_ROLES },
+        },
+
+        // Envios
+        {
+          path: 'shipments',
+          name: 'shipments',
+          component: () => import('@/views/shipments/ShipmentsView.vue'),
+          meta: { title: 'Envios', roles: SHIPMENT_READ_ROLES },
+        },
+        {
+          path: 'shipments/:id',
+          name: 'shipments-detail',
+          component: () => import('@/views/shipments/ShipmentsView.vue'),
+          meta: { title: 'Detalle de envio', roles: SHIPMENT_READ_ROLES },
+        },
+        {
+          path: 'carriers',
+          name: 'carriers',
+          component: () => import('@/views/shipments/CarriersView.vue'),
+          meta: { title: 'Transportadoras', roles: CARRIER_MANAGE_ROLES },
+        },
+
         // Usuarios
         {
           path: 'users',
@@ -202,6 +240,12 @@ const router = createRouter({
             component: () => import('@/views/tags/TagsView.vue'),
             meta: { title: 'Tags', roles: CATALOG_MANAGE_ROLES },
           },
+        {
+          path: 'email-templates',
+          name: 'email-templates',
+          component: () => import('@/views/email-templates/EmailTemplatesView.vue'),
+          meta: { title: 'Plantillas de email', roles: CATALOG_MANAGE_ROLES },
+        },
       ],
     },
 

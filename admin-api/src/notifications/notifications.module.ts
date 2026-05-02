@@ -10,10 +10,18 @@ import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
 import { NoopMailProvider } from './providers/noop-mail.provider';
 import { ResendMailProvider } from './providers/resend-mail.provider';
+import { EmailTemplate } from './templates/entities/email-template.entity';
+import { EmailTemplatesController } from './templates/email-templates.controller';
+import { MailService } from './templates/mail.service';
+import { TemplateEngineService } from './templates/template-engine.service';
 
 @Module({
-  imports: [ConfigModule, JwtModule.register({}), TypeOrmModule.forFeature([Notification, User])],
-  controllers: [NotificationsController],
+  imports: [
+    ConfigModule,
+    JwtModule.register({}),
+    TypeOrmModule.forFeature([Notification, User, EmailTemplate]),
+  ],
+  controllers: [NotificationsController, EmailTemplatesController],
   providers: [
     NoopMailProvider,
     {
@@ -33,9 +41,11 @@ import { ResendMailProvider } from './providers/resend-mail.provider';
         return noopMailProvider;
       },
     },
+    TemplateEngineService,
+    MailService,
     NotificationsGateway,
     NotificationsService,
   ],
-  exports: [NotificationsService],
+  exports: [NotificationsService, MailService],
 })
 export class NotificationsModule {}
