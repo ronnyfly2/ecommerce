@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, ILike, In, Repository } from 'typeorm';
 import { CreateInventoryAdjustmentDto } from './dto/create-inventory-adjustment.dto';
 import { QueryInventoryMovementsDto } from './dto/query-inventory-movements.dto';
+import { QueryKardexDto } from './dto/query-kardex.dto';
 import { UpsertProductStockDto } from './dto/upsert-product-stock.dto';
 import { QueryProductStocksDto } from './dto/query-product-stocks.dto';
 import { BulkUpsertProductStocksDto } from './dto/bulk-upsert-product-stocks.dto';
@@ -510,6 +511,143 @@ export class InventoryService {
     };
   }
 
+  async getKardex(query: QueryKardexDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 100);
+    const skip = (page - 1) * limit;
+
+    const product = await this.productsRepository.findOne({ where: { id: query.productId } });
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Build reusable raw WHERE conditions for count + balance queries
+    const conditions: string[] = ['m.product_id = $1'];
+    const rawParams: unknown[] = [query.productId];
+    let p = 2;
+
+    if (query.channelType) {
+      conditions.push(`m.channel_type = $${p++}`);
+      rawParams.push(query.channelType);
+    }
+    if (query.storeId) {
+      conditions.push(`m.store_id = $${p++}`);
+      rawParams.push(query.storeId);
+    }
+    if (query.startDate) {
+      conditions.push(`m.created_at >= $${p++}`);
+      rawParams.push(new Date(query.startDate));
+    }
+    if (query.endDate) {
+      const end = new Date(query.endDate);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(`m.created_at <= $${p++}`);
+      rawParams.push(end);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Total count
+    const countResult = await this.movementsRepository.query(
+      `SELECT COUNT(*)::int AS total FROM inventory_movements m WHERE ${whereClause}`,
+      rawParams,
+    );
+    const total = Number(countResult[0]?.total ?? 0);
+
+    // Running balance before this page (sum of first `skip` ordered rows)
+    let balanceBefore = 0;
+    if (skip > 0) {
+      const balanceResult = await this.movementsRepository.query(
+        `SELECT COALESCE(SUM(t.quantity_change), 0)::int AS balance
+         FROM (
+           SELECT m.quantity_change
+           FROM inventory_movements m
+           WHERE ${whereClause}
+           ORDER BY m.created_at ASC, m.id ASC
+           LIMIT $${p}
+         ) t`,
+        [...rawParams, skip],
+      );
+      balanceBefore = Number(balanceResult[0]?.balance ?? 0);
+    }
+
+    // Fetch page movements via QueryBuilder for relation loading
+    const qb = this.movementsRepository
+      .createQueryBuilder('m')
+      .leftJoinAndSelect('m.product', 'product')
+      .leftJoinAndSelect('m.variant', 'variant')
+      .leftJoinAndSelect('variant.size', 'vsize')
+      .leftJoinAndSelect('variant.color', 'vcolor')
+      .leftJoinAndSelect('m.store', 'store')
+      .leftJoinAndSelect('m.createdBy', 'createdBy')
+      .where('m.product_id = :productId', { productId: query.productId });
+
+    if (query.channelType) {
+      qb.andWhere('m.channelType = :channelType', { channelType: query.channelType });
+    }
+    if (query.storeId) {
+      qb.andWhere('m.store_id = :storeId', { storeId: query.storeId });
+    }
+    if (query.startDate) {
+      qb.andWhere('m.createdAt >= :startDate', { startDate: new Date(query.startDate) });
+    }
+    if (query.endDate) {
+      const end = new Date(query.endDate);
+      end.setHours(23, 59, 59, 999);
+      qb.andWhere('m.createdAt <= :endDate', { endDate: end });
+    }
+
+    qb.orderBy('m.createdAt', 'ASC').addOrderBy('m.id', 'ASC').skip(skip).take(limit);
+
+    const movements = await qb.getMany();
+
+    // Compute running balance per row
+    let runningBalance = balanceBefore;
+    const items = movements.map((m) => {
+      runningBalance += m.quantityChange;
+      return {
+        id: m.id,
+        date: m.createdAt,
+        type: m.type,
+        channelType: m.channelType,
+        store: m.store ? { id: m.store.id, code: m.store.code, name: m.store.name } : null,
+        variant: m.variant
+          ? {
+              id: m.variant.id,
+              sku: m.variant.sku,
+              size: m.variant.size ?? null,
+              color: m.variant.color ?? null,
+            }
+          : null,
+        quantityChange: m.quantityChange,
+        entrada: m.quantityChange > 0 ? m.quantityChange : 0,
+        salida: m.quantityChange < 0 ? Math.abs(m.quantityChange) : 0,
+        balance: runningBalance,
+        reason: m.reason,
+        createdBy: m.createdBy
+          ? { id: m.createdBy.id, email: m.createdBy.email, firstName: (m.createdBy as any).firstName ?? null }
+          : null,
+      };
+    });
+
+    return {
+      product: {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        stock: product.stock,
+      },
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        balanceBefore,
+      },
+    };
+  }
+
   private async ensureDeliveryStock(product: Product) {
     const existing = await this.deliveryStocksRepository.findOne({
       where: { product: { id: product.id } },
@@ -574,6 +712,8 @@ export class InventoryService {
       city: dto.city,
       country: dto.country,
       address: dto.address ?? null,
+      lat: dto.lat != null ? String(dto.lat) : null,
+      lng: dto.lng != null ? String(dto.lng) : null,
       isActive: dto.isActive ?? true,
     });
     return this.storesRepository.save(store);
@@ -595,6 +735,8 @@ export class InventoryService {
     if (dto.city !== undefined) store.city = dto.city;
     if (dto.country !== undefined) store.country = dto.country;
     if (dto.address !== undefined) store.address = dto.address ?? null;
+    if (dto.lat !== undefined) store.lat = dto.lat == null ? null : String(dto.lat);
+    if (dto.lng !== undefined) store.lng = dto.lng == null ? null : String(dto.lng);
     if (dto.isActive !== undefined) store.isActive = dto.isActive;
     return this.storesRepository.save(store);
   }

@@ -30,6 +30,12 @@ export class Store {
   @Column({ type: 'varchar', nullable: true })
   address: string | null;
 
+  @Column({ name: 'lat', type: 'decimal', precision: 10, scale: 6, nullable: true })
+  lat: string | null;
+
+  @Column({ name: 'lng', type: 'decimal', precision: 10, scale: 6, nullable: true })
+  lng: string | null;
+
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 

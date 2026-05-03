@@ -161,12 +161,77 @@ export interface UpsertCarrierDto {
   config?: Record<string, unknown>
 }
 
+type ShipmentListPayload =
+  | ApiPaginatedData<Shipment>
+  | Shipment[]
+  | {
+      items?: Shipment[]
+      total?: number
+      page?: number
+      limit?: number
+      totalPages?: number
+    }
+
+type LegacyShipmentListPayload = {
+  items?: Shipment[]
+  total?: number
+  page?: number
+  limit?: number
+  totalPages?: number
+}
+
+function normalizeShipmentListPayload(payload: ShipmentListPayload): ApiPaginatedData<Shipment> {
+  if (Array.isArray(payload)) {
+    return {
+      items: payload,
+      meta: {
+        total: payload.length,
+        page: 1,
+        limit: payload.length || 20,
+        totalPages: payload.length > 0 ? 1 : 0,
+      },
+    }
+  }
+
+  // Standard shape: { items, meta }
+  if ('meta' in payload && payload.meta && Array.isArray(payload.items)) {
+    const normalizedLimit = payload.meta.limit ?? (payload.items.length || 20)
+    return {
+      items: payload.items,
+      meta: {
+        total: payload.meta.total ?? payload.items.length,
+        page: payload.meta.page ?? 1,
+        limit: normalizedLimit,
+        totalPages: payload.meta.totalPages ?? 1,
+      },
+    }
+  }
+
+  // Legacy shape: { items, total, page, limit, totalPages }
+  const legacy = payload as LegacyShipmentListPayload
+  const items = Array.isArray(legacy.items) ? legacy.items : []
+  const total = legacy.total ?? items.length
+  const limit = legacy.limit ?? (items.length || 20)
+  const page = legacy.page ?? 1
+  const totalPages = legacy.totalPages ?? Math.ceil(total / Math.max(limit, 1))
+
+  return {
+    items,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages,
+    },
+  }
+}
+
 export const shipmentsService = {
   async list(query: QueryShipmentsDto = {}): Promise<ApiPaginatedData<Shipment>> {
-    const res = await http.get<ApiResponse<ApiPaginatedData<Shipment>>>('/shipments', {
+    const res = await http.get<ApiResponse<ShipmentListPayload>>('/shipments', {
       params: query,
     })
-    return res.data.data
+    return normalizeShipmentListPayload(res.data.data)
   },
 
   async get(id: string): Promise<Shipment> {

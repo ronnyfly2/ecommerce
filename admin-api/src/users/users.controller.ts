@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { USER_MANAGE_ROLES, USER_READ_ROLES } from '../common/auth/role-groups';
+import { GetUser } from '../common/decorators/get-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -25,8 +26,8 @@ export class UsersController {
 
   @Roles(...USER_MANAGE_ROLES)
   @Post()
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(@Body() dto: CreateUserDto, @GetUser() actor: Express.User) {
+    return this.usersService.create(dto, actor);
   }
 
   @Roles(...USER_READ_ROLES)
@@ -43,8 +44,8 @@ export class UsersController {
 
   @Roles(...USER_MANAGE_ROLES)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto, @GetUser() actor: Express.User) {
+    return this.usersService.update(id, dto, actor);
   }
 
   @Roles(Role.SUPER_ADMIN)

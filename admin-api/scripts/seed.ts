@@ -1,5 +1,5 @@
 import * as bcrypt from 'bcrypt';
-import { In } from 'typeorm';
+import { In, Like } from 'typeorm';
 import { AppDataSource } from '../src/data-source';
 import { Category } from '../src/categories/entities/category.entity';
 import { Color } from '../src/colors/entities/color.entity';
@@ -18,6 +18,12 @@ import { OrderStatus } from '../src/orders/enums/order-status.enum';
 import { Product } from '../src/products/entities/product.entity';
 import { ProductImage } from '../src/products/entities/product-image.entity';
 import { ProductVariant } from '../src/products/entities/product-variant.entity';
+import { Carrier } from '../src/shipments/entities/carrier.entity';
+import { Shipment } from '../src/shipments/entities/shipment.entity';
+import { ShipmentEvent } from '../src/shipments/entities/shipment-event.entity';
+import { ShipmentItem } from '../src/shipments/entities/shipment-item.entity';
+import { ShipmentEventType } from '../src/shipments/enums/shipment-event-type.enum';
+import { ShipmentStatus } from '../src/shipments/enums/shipment-status.enum';
 import { Size } from '../src/sizes/entities/size.entity';
 import { Tag } from '../src/tags/entities/tag.entity';
 import { Role } from '../src/common/enums/role.enum';
@@ -64,6 +70,10 @@ async function seed() {
     const variantRepository = AppDataSource.getRepository(ProductVariant);
     const inventoryRepository = AppDataSource.getRepository(InventoryMovement);
     const orderRepository = AppDataSource.getRepository(Order);
+    const carrierRepository = AppDataSource.getRepository(Carrier);
+    const shipmentRepository = AppDataSource.getRepository(Shipment);
+    const shipmentItemRepository = AppDataSource.getRepository(ShipmentItem);
+    const shipmentEventRepository = AppDataSource.getRepository(ShipmentEvent);
     const notificationRepository = AppDataSource.getRepository(Notification);
 
     const upsertSeedUser = async (params: {
@@ -661,7 +671,257 @@ async function seed() {
 
     const savedConfirmedOrder = await orderRepository.save(confirmedVariantOrder);
     const savedPendingOrder = await orderRepository.save(pendingMixedOrder);
-    await orderRepository.save(deliveredCoffeeOrder);
+    const savedDeliveredOrder = await orderRepository.save(deliveredCoffeeOrder);
+
+    // Upsert carriers for shipment demo flow
+    let ownFleetCarrier = await carrierRepository.findOne({ where: { code: 'own-fleet' } });
+    if (!ownFleetCarrier) {
+      ownFleetCarrier = carrierRepository.create({
+        code: 'own-fleet',
+        label: 'Transporte propio',
+        description: 'Flota interna para envios urbanos (seed)',
+        trackingUrlTemplate: null,
+        isEnabled: true,
+        displayOrder: 0,
+        logoUrl: null,
+        config: {
+          operational: {
+            operationMode: 'OWN_FLEET',
+            mapProvider: 'OPENSTREETMAP',
+            geolocationMode: 'MOBILE_APP',
+            supportsRealtimeTracking: true,
+            supportsRouteOptimization: true,
+            supportsProofOfDelivery: true,
+            defaultHubLat: -12.0464,
+            defaultHubLng: -77.0428,
+            coverageRadiusKm: 30,
+            hubAddress: 'Lima Centro',
+            dispatchContactPhone: '+51 999 999 999',
+          },
+        },
+      });
+    } else {
+      ownFleetCarrier.isEnabled = true;
+      ownFleetCarrier.config = {
+        ...(ownFleetCarrier.config ?? {}),
+        operational: {
+          operationMode: 'OWN_FLEET',
+          mapProvider: 'OPENSTREETMAP',
+          geolocationMode: 'MOBILE_APP',
+          supportsRealtimeTracking: true,
+          supportsRouteOptimization: true,
+          supportsProofOfDelivery: true,
+          defaultHubLat: -12.0464,
+          defaultHubLng: -77.0428,
+          coverageRadiusKm: 30,
+          hubAddress: 'Lima Centro',
+          dispatchContactPhone: '+51 999 999 999',
+        },
+      };
+    }
+    ownFleetCarrier = await carrierRepository.save(ownFleetCarrier);
+
+    let externalCarrier = await carrierRepository.findOne({ where: { code: 'seed-express' } });
+    if (!externalCarrier) {
+      externalCarrier = carrierRepository.create({
+        code: 'seed-express',
+        label: 'Seed Express',
+        description: 'Courier externo de demostracion para flujo de envios',
+        trackingUrlTemplate: 'https://tracking.seedexpress.local/{tracking}',
+        isEnabled: true,
+        displayOrder: 5,
+        logoUrl: null,
+        config: {
+          operational: {
+            operationMode: 'THIRD_PARTY',
+            mapProvider: 'OPENSTREETMAP',
+            geolocationMode: 'MANUAL',
+            supportsRealtimeTracking: false,
+            supportsRouteOptimization: false,
+            supportsProofOfDelivery: false,
+            defaultHubLat: null,
+            defaultHubLng: null,
+            coverageRadiusKm: null,
+            hubAddress: null,
+            dispatchContactPhone: null,
+          },
+        },
+      });
+    } else {
+      externalCarrier.isEnabled = true;
+      externalCarrier.trackingUrlTemplate = 'https://tracking.seedexpress.local/{tracking}';
+    }
+    externalCarrier = await carrierRepository.save(externalCarrier);
+
+    // Cleanup and recreate seed shipments for idempotent runs
+    const existingSeedShipments = await shipmentRepository.find({
+      where: { notes: Like(`${SEED_NOTE_PREFIX}%`) },
+      relations: { items: true, events: true },
+    });
+    if (existingSeedShipments.length > 0) {
+      await shipmentRepository.remove(existingSeedShipments);
+    }
+
+    const confirmedOrderForShipment = await orderRepository.findOne({
+      where: { id: savedConfirmedOrder.id },
+      relations: { items: true, shippingAddresses: true },
+    });
+    const pendingOrderForShipment = await orderRepository.findOne({
+      where: { id: savedPendingOrder.id },
+      relations: { items: true, shippingAddresses: true },
+    });
+    const deliveredOrderForShipment = await orderRepository.findOne({
+      where: { id: savedDeliveredOrder.id },
+      relations: { items: true, shippingAddresses: true },
+    });
+
+    if (!confirmedOrderForShipment || !pendingOrderForShipment || !deliveredOrderForShipment) {
+      throw new Error('No se pudieron recargar las ordenes seed para crear envios');
+    }
+
+    const confirmedAddress = confirmedOrderForShipment.shippingAddresses?.[0] ?? null;
+    const pendingAddress = pendingOrderForShipment.shippingAddresses?.[0] ?? null;
+    const deliveredAddress = deliveredOrderForShipment.shippingAddresses?.[0] ?? null;
+
+    const shipmentReady = await shipmentRepository.save(
+      shipmentRepository.create({
+        order: confirmedOrderForShipment,
+        carrier: ownFleetCarrier,
+        status: ShipmentStatus.READY_TO_SHIP,
+        trackingNumber: 'OF-0001',
+        trackingUrl: null,
+        shippingCost: '12.50',
+        currencyCode: 'USD',
+        shipToName: confirmedAddress ? `${confirmedAddress.firstName} ${confirmedAddress.lastName}` : 'Ana Cliente',
+        shipToStreet: confirmedAddress?.street ?? null,
+        shipToCity: confirmedAddress?.city ?? null,
+        shipToState: confirmedAddress?.state ?? null,
+        shipToPostalCode: confirmedAddress?.postalCode ?? null,
+        shipToCountry: confirmedAddress?.country ?? null,
+        shipToPhone: confirmedAddress?.phoneNumber ?? null,
+        shipToLat: '-12.097877',
+        shipToLng: '-77.036992',
+        estimatedDeliveryAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
+        notes: `${SEED_NOTE_PREFIX} envio listo para despacho`,
+        metadata: { seedScope: SEED_SCOPE, seedKey: 'shipment-ready' },
+      }),
+    );
+
+    const shipmentPending = await shipmentRepository.save(
+      shipmentRepository.create({
+        order: pendingOrderForShipment,
+        carrier: externalCarrier,
+        status: ShipmentStatus.PENDING,
+        trackingNumber: 'SE-0002',
+        trackingUrl: 'https://tracking.seedexpress.local/SE-0002',
+        shippingCost: '9.90',
+        currencyCode: 'USD',
+        shipToName: pendingAddress ? `${pendingAddress.firstName} ${pendingAddress.lastName}` : 'Luis Cliente',
+        shipToStreet: pendingAddress?.street ?? null,
+        shipToCity: pendingAddress?.city ?? null,
+        shipToState: pendingAddress?.state ?? null,
+        shipToPostalCode: pendingAddress?.postalCode ?? null,
+        shipToCountry: pendingAddress?.country ?? null,
+        shipToPhone: pendingAddress?.phoneNumber ?? null,
+        shipToLat: '-13.531950',
+        shipToLng: '-71.967463',
+        estimatedDeliveryAt: new Date(Date.now() + 1000 * 60 * 60 * 48),
+        notes: `${SEED_NOTE_PREFIX} envio pendiente de confirmacion courier`,
+        metadata: { seedScope: SEED_SCOPE, seedKey: 'shipment-pending' },
+      }),
+    );
+
+    const shipmentDelivered = await shipmentRepository.save(
+      shipmentRepository.create({
+        order: deliveredOrderForShipment,
+        carrier: ownFleetCarrier,
+        status: ShipmentStatus.DELIVERED,
+        trackingNumber: 'OF-0003',
+        trackingUrl: null,
+        shippingCost: '10.00',
+        currencyCode: 'USD',
+        shipToName: deliveredAddress ? `${deliveredAddress.firstName} ${deliveredAddress.lastName}` : 'Carla Cliente',
+        shipToStreet: deliveredAddress?.street ?? null,
+        shipToCity: deliveredAddress?.city ?? null,
+        shipToState: deliveredAddress?.state ?? null,
+        shipToPostalCode: deliveredAddress?.postalCode ?? null,
+        shipToCountry: deliveredAddress?.country ?? null,
+        shipToPhone: deliveredAddress?.phoneNumber ?? null,
+        shipToLat: '-16.398866',
+        shipToLng: '-71.536961',
+        estimatedDeliveryAt: new Date(Date.now() - 1000 * 60 * 60 * 12),
+        shippedAt: new Date(Date.now() - 1000 * 60 * 60 * 30),
+        deliveredAt: new Date(Date.now() - 1000 * 60 * 60 * 6),
+        notes: `${SEED_NOTE_PREFIX} envio entregado`,
+        metadata: { seedScope: SEED_SCOPE, seedKey: 'shipment-delivered' },
+      }),
+    );
+
+    await shipmentItemRepository.save(
+      confirmedOrderForShipment.items.map((orderItem) =>
+        shipmentItemRepository.create({
+          shipment: shipmentReady,
+          orderItem,
+          quantity: orderItem.quantity,
+        }),
+      ),
+    );
+
+    await shipmentItemRepository.save(
+      pendingOrderForShipment.items.map((orderItem) =>
+        shipmentItemRepository.create({
+          shipment: shipmentPending,
+          orderItem,
+          quantity: orderItem.quantity,
+        }),
+      ),
+    );
+
+    await shipmentItemRepository.save(
+      deliveredOrderForShipment.items.map((orderItem) =>
+        shipmentItemRepository.create({
+          shipment: shipmentDelivered,
+          orderItem,
+          quantity: orderItem.quantity,
+        }),
+      ),
+    );
+
+    await shipmentEventRepository.save([
+      shipmentEventRepository.create({
+        shipment: shipmentReady,
+        type: ShipmentEventType.STATUS_CHANGE,
+        status: ShipmentStatus.READY_TO_SHIP,
+        location: 'Lima Centro',
+        lat: '-12.046400',
+        lng: '-77.042800',
+        description: 'Paquete preparado en hub principal',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 45),
+        createdBy: seedAdmin,
+      }),
+      shipmentEventRepository.create({
+        shipment: shipmentPending,
+        type: ShipmentEventType.NOTE,
+        status: null,
+        location: 'Cusco',
+        lat: '-13.531950',
+        lng: '-71.967463',
+        description: 'Esperando recoleccion por courier externo',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 20),
+        createdBy: seedAdmin,
+      }),
+      shipmentEventRepository.create({
+        shipment: shipmentDelivered,
+        type: ShipmentEventType.STATUS_CHANGE,
+        status: ShipmentStatus.DELIVERED,
+        location: 'Arequipa',
+        lat: '-16.398866',
+        lng: '-71.536961',
+        description: 'Entrega completada con firma del cliente',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 360),
+        createdBy: seedAdmin,
+      }),
+    ]);
 
     if (welcomeCoupon) {
       welcomeCoupon.usageCount = 1;
@@ -686,6 +946,7 @@ async function seed() {
     console.log(`- Tags demo: ${SEED_TAG_SLUGS.length}`);
     console.log(`- Cupones demo: ${SEED_COUPON_CODES.length}`);
     console.log('- Ordenes demo: 3');
+    console.log('- Envios demo: 3');
     console.log(`- Notificaciones demo: ${notifications.length}`);
     console.log('\nCredenciales de acceso por defecto:');
     console.log(`- SUPER_ADMIN: ${superAdminRawPassword} (emails: ${superAdminEmail}, superadmin2@local.dev)`);

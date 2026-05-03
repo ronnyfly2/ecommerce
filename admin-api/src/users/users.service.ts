@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -7,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { Role } from '../common/enums/role.enum';
+import { normalizePermissionKeys, PermissionKey } from '../common/auth/permissions';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
@@ -19,7 +21,7 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
   ) {}
 
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, actor: Express.User) {
     const email = dto.email.toLowerCase();
 
     const existingUser = await this.usersRepository.findOne({ where: { email } });
@@ -35,6 +37,8 @@ export class UsersService {
       firstName: dto.firstName ?? null,
       lastName: dto.lastName ?? null,
       role: dto.role ?? Role.ADMIN,
+      grantedRoles: this.resolveGrantedRoles(dto.grantedRoles, actor),
+      grantedPermissions: this.resolveGrantedPermissions(dto.grantedPermissions, actor),
       isActive: true,
     });
 
@@ -76,7 +80,7 @@ export class UsersService {
     return this.sanitize(user);
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateUserDto, actor: Express.User) {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -105,6 +109,17 @@ export class UsersService {
 
     if (dto.role) {
       user.role = dto.role;
+    }
+
+    if (dto.grantedRoles !== undefined) {
+      user.grantedRoles = this.resolveGrantedRoles(dto.grantedRoles, actor);
+    }
+
+    if (dto.grantedPermissions !== undefined) {
+      user.grantedPermissions = this.resolveGrantedPermissions(
+        dto.grantedPermissions,
+        actor,
+      );
     }
 
     if (dto.isActive !== undefined) {
@@ -150,5 +165,39 @@ export class UsersService {
   private sanitize(user: User) {
     const { passwordHash, ...safeUser } = user;
     return safeUser;
+  }
+
+  private resolveGrantedRoles(
+    grantedRoles: Role[] | undefined,
+    actor: Pick<User, 'role'>,
+  ): Role[] {
+    if (grantedRoles === undefined) {
+      return [];
+    }
+
+    if (actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Only SUPER_ADMIN can manage delegated permissions');
+    }
+
+    const uniqueRoles = Array.from(
+      new Set((grantedRoles ?? []).filter((role) => role !== Role.SUPER_ADMIN)),
+    );
+
+    return uniqueRoles;
+  }
+
+  private resolveGrantedPermissions(
+    grantedPermissions: PermissionKey[] | undefined,
+    actor: Pick<User, 'role'>,
+  ): PermissionKey[] {
+    if (grantedPermissions === undefined) {
+      return [];
+    }
+
+    if (actor.role !== Role.SUPER_ADMIN) {
+      throw new ForbiddenException('Only SUPER_ADMIN can manage delegated permissions');
+    }
+
+    return normalizePermissionKeys(grantedPermissions);
   }
 }

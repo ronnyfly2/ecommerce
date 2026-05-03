@@ -10,6 +10,7 @@ import UiBadge from '@/components/ui/UiBadge.vue'
 import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import ListViewToolbar from '@/components/shared/ListViewToolbar.vue'
+import LeafletAddressPicker from '@/components/maps/LeafletAddressPicker.vue'
 import { useToast } from '@/composables/useToast'
 
 const toast = useToast()
@@ -27,6 +28,8 @@ const form = reactive({
   city: '',
   country: '',
   address: '',
+  lat: '',
+  lng: '',
   isActive: true,
 })
 
@@ -62,6 +65,8 @@ function resetForm() {
   form.city = ''
   form.country = ''
   form.address = ''
+  form.lat = ''
+  form.lng = ''
   form.isActive = true
   form.isEdit = false
 }
@@ -79,6 +84,8 @@ function openEdit(store: Store) {
   form.city = store.city
   form.country = store.country
   form.address = store.address ?? ''
+  form.lat = store.lat ?? ''
+  form.lng = store.lng ?? ''
   form.isActive = store.isActive
   form.show = true
 }
@@ -114,6 +121,8 @@ async function submit() {
         city: form.city.trim(),
         country: form.country.trim(),
         address: form.address.trim() || undefined,
+        lat: form.lat ? Number(form.lat) : undefined,
+        lng: form.lng ? Number(form.lng) : undefined,
         isActive: form.isActive,
       }
       await inventoryService.updateStore(form.id, dto)
@@ -125,6 +134,8 @@ async function submit() {
         city: form.city.trim(),
         country: form.country.trim(),
         address: form.address.trim() || undefined,
+        lat: form.lat ? Number(form.lat) : undefined,
+        lng: form.lng ? Number(form.lng) : undefined,
         isActive: form.isActive,
       }
       await inventoryService.createStore(dto)
@@ -200,19 +211,33 @@ onMounted(load)
     </UiCard>
 
     <UiModal :show="form.show" :title="form.isEdit ? 'Editar tienda' : 'Nueva tienda'" size="lg" @close="form.show = false">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="space-y-3 max-h-[75vh] overflow-y-auto pr-1">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <UiInput v-model="form.code" label="Código" placeholder="Ej: LA_MOLINA" />
         <UiInput v-model="form.name" label="Nombre" placeholder="Ej: Tienda La Molina" />
         <UiInput v-model="form.city" label="Ciudad" />
         <UiInput v-model="form.country" label="País" />
+        </div>
+
+        <UiInput v-model="form.address" label="Dirección" placeholder="Opcional" />
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <UiInput v-model="form.lat" label="Latitud" placeholder="-12.0464" />
+          <UiInput v-model="form.lng" label="Longitud" placeholder="-77.0428" />
+        </div>
+
+        <LeafletAddressPicker
+          v-model:address="form.address"
+          v-model:lat="form.lat"
+          v-model:lng="form.lng"
+          height-class="h-72"
+        />
+
+        <label class="inline-flex items-center gap-2 text-sm text-muted">
+          <input v-model="form.isActive" type="checkbox" class="rounded border-surface-300" />
+          Tienda activa
+        </label>
       </div>
-
-      <UiInput v-model="form.address" class="mt-3" label="Dirección" placeholder="Opcional" />
-
-      <label class="mt-3 inline-flex items-center gap-2 text-sm text-muted">
-        <input v-model="form.isActive" type="checkbox" class="rounded border-surface-300" />
-        Tienda activa
-      </label>
 
       <template #footer>
         <div class="flex justify-end gap-2">

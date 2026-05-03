@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
+import { PermissionKey } from '../../common/auth/permissions';
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 
 @Entity('users')
@@ -32,6 +33,20 @@ export class User {
     default: Role.CUSTOMER,
   })
   role: Role;
+
+  @Column({
+    name: 'granted_roles',
+    type: 'simple-array',
+    default: '',
+  })
+  grantedRoles: Role[];
+
+  @Column({
+    name: 'granted_permissions',
+    type: 'simple-array',
+    default: '',
+  })
+  grantedPermissions: PermissionKey[];
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

@@ -26,6 +26,10 @@ import { ProductReview } from './reviews/entities/product-review.entity';
 import { Store } from './inventory/entities/store.entity';
 import { ProductDeliveryStock } from './inventory/entities/product-delivery-stock.entity';
 import { ProductStoreStock } from './inventory/entities/product-store-stock.entity';
+import { Carrier } from './shipments/entities/carrier.entity';
+import { Shipment } from './shipments/entities/shipment.entity';
+import { ShipmentEvent } from './shipments/entities/shipment-event.entity';
+import { ShipmentItem } from './shipments/entities/shipment-item.entity';
 
 dotenv.config({ path: '.env' });
 
@@ -63,6 +67,10 @@ export const AppDataSource = new DataSource({
     Store,
     ProductDeliveryStock,
     ProductStoreStock,
+    Carrier,
+    Shipment,
+    ShipmentEvent,
+    ShipmentItem,
   ],
   migrations: ['src/migration/*.ts'],
   logging: false,

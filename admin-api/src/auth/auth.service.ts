@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomUUID } from 'crypto';
 import ms, { StringValue } from 'ms';
 import { IsNull, Repository } from 'typeorm';
+import { expandPermissionKeys } from '../common/auth/permissions';
 import { Role } from '../common/enums/role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/entities/user.entity';
@@ -335,8 +336,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const { passwordHash, ...safeUser } = user;
-    return safeUser;
+    return this.buildSafeAuthUser(user);
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
@@ -362,19 +362,24 @@ export class AuthService {
     }
 
     const saved = await this.usersRepository.save(user);
-    const { passwordHash, ...safeUser } = saved;
-    return safeUser;
+    return this.buildSafeAuthUser(saved);
   }
 
   private async buildAuthResponse(user: User, requestContext: AuthRequestContext) {
     const { accessToken, refreshToken } = await this.issueTokenPair(user, requestContext);
 
-    const { passwordHash, ...safeUser } = user;
-
     return {
       accessToken,
       refreshToken,
-      user: safeUser,
+      user: this.buildSafeAuthUser(user),
+    };
+  }
+
+  private buildSafeAuthUser(user: User) {
+    const { passwordHash, ...safeUser } = user;
+    return {
+      ...safeUser,
+      effectivePermissions: expandPermissionKeys(safeUser.grantedPermissions ?? []),
     };
   }
 
@@ -388,6 +393,8 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      grantedRoles: user.grantedRoles ?? [],
+      grantedPermissions: user.grantedPermissions ?? [],
       tokenType: 'access',
     };
 
@@ -396,6 +403,8 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      grantedRoles: user.grantedRoles ?? [],
+      grantedPermissions: user.grantedPermissions ?? [],
       tokenType: 'refresh',
       tokenId: refreshTokenId,
     };

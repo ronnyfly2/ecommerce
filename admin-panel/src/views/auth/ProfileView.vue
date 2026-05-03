@@ -5,6 +5,14 @@ import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/services/auth.service'
 import { extractErrorMessage } from '@/utils/error'
 import type { RefreshTokenRecord } from '@/types/api'
+import {
+  PERMISSION_RESOURCES,
+  CRUD_ACTIONS,
+  PERMISSION_LABELS,
+  PERMISSION_ACTION_LABELS,
+  type PermissionResource,
+  type CrudAction,
+} from '@/utils/permissions'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
@@ -374,6 +382,35 @@ async function onAvatarSelected(event: Event) {
   }
 }
 
+// ──────────── Effective permissions matrix ────────────
+const directPermSet = computed(() =>
+  new Set<string>(auth.user?.grantedPermissions ?? []),
+)
+const effectivePermSet = computed(() =>
+  new Set<string>(auth.user?.effectivePermissions ?? auth.user?.grantedPermissions ?? []),
+)
+const impliedPermSet = computed(() => {
+  const s = new Set<string>()
+  for (const perm of effectivePermSet.value) {
+    if (!directPermSet.value.has(perm)) s.add(perm)
+  }
+  return s
+})
+
+function permStatus(resource: PermissionResource, action: CrudAction): 'direct' | 'implied' | 'none' {
+  const key = `${resource}.${action}`
+  if (directPermSet.value.has(key)) return 'direct'
+  if (impliedPermSet.value.has(key)) return 'implied'
+  return 'none'
+}
+
+const visibleResources = computed(() => {
+  if (auth.isSuperAdmin) return [...PERMISSION_RESOURCES]
+  return [...PERMISSION_RESOURCES].filter((r) =>
+    CRUD_ACTIONS.some((a) => effectivePermSet.value.has(`${r}.${a}`)),
+  )
+})
+
 onMounted(async () => {
   await loadSessions()
   hydrateProfileForm()
@@ -444,6 +481,142 @@ onMounted(async () => {
           </UiBadge>
         </div>
       </div>
+      </div>
+    </UiCard>
+
+    <!-- ── Permisos efectivos ── -->
+    <UiCard title="Permisos efectivos">
+      <!-- SUPER_ADMIN: acceso total -->
+      <div
+        v-if="auth.isSuperAdmin"
+        class="flex items-center gap-4 rounded-lg border border-primary-200 bg-primary-50 px-5 py-4"
+      >
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-5 w-5">
+            <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+          </svg>
+        </span>
+        <div>
+          <p class="font-semibold text-primary-800">Acceso total — SUPER_ADMIN</p>
+          <p class="mt-0.5 text-sm text-primary-600">Este rol tiene acceso irrestricto a todas las funcionalidades y recursos del sistema.</p>
+        </div>
+      </div>
+
+      <!-- Otros roles -->
+      <div v-else class="space-y-5">
+        <!-- Rol + roles delegados -->
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <span class="text-caption">Rol base:</span>
+          <UiBadge color="primary">{{ auth.user?.role }}</UiBadge>
+          <template v-if="auth.user?.grantedRoles?.length">
+            <span class="text-caption ml-1">Roles delegados:</span>
+            <UiBadge v-for="r in auth.user.grantedRoles" :key="r" color="neutral">{{ r }}</UiBadge>
+          </template>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="grid grid-cols-3 gap-3 text-center text-sm">
+          <div class="rounded-lg border border-primary-200 bg-primary-50 px-2 py-3">
+            <p class="text-2xl font-bold tabular-nums text-primary-700">{{ directPermSet.size }}</p>
+            <p class="mt-0.5 text-caption">Directos</p>
+          </div>
+          <div class="rounded-lg border border-primary-100 bg-primary-50/40 px-2 py-3">
+            <p class="text-2xl font-bold tabular-nums text-primary-400">{{ impliedPermSet.size }}</p>
+            <p class="mt-0.5 text-caption">Implicados</p>
+          </div>
+          <div class="rounded-lg border border-surface-200 bg-surface-50 px-2 py-3">
+            <p class="text-2xl font-bold tabular-nums text-surface-700">{{ effectivePermSet.size }}</p>
+            <p class="mt-0.5 text-caption">Total efectivos</p>
+          </div>
+        </div>
+
+        <!-- Sin permisos -->
+        <div
+          v-if="!visibleResources.length"
+          class="rounded-lg border border-surface-200 bg-surface-50 px-4 py-8 text-center text-sm text-muted"
+        >
+          Este usuario no tiene permisos asignados aún.
+        </div>
+
+        <!-- Matriz de permisos -->
+        <div v-else class="-mx-6 overflow-x-auto">
+          <table class="min-w-full border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-surface-200 bg-surface-50">
+                <th class="py-2.5 pl-6 pr-4 text-left text-caption font-medium text-surface-600">Recurso</th>
+                <th
+                  v-for="action in CRUD_ACTIONS"
+                  :key="action"
+                  class="min-w-18 py-2.5 px-2 text-center text-caption font-medium text-surface-600"
+                >
+                  {{ PERMISSION_ACTION_LABELS[action] }}
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-100">
+              <tr
+                v-for="resource in visibleResources"
+                :key="resource"
+                class="transition-colors hover:bg-surface-50"
+              >
+                <td class="py-2 pl-6 pr-4 font-medium text-surface-800">
+                  {{ PERMISSION_LABELS[resource] }}
+                </td>
+                <td
+                  v-for="action in CRUD_ACTIONS"
+                  :key="action"
+                  class="py-2 px-2 text-center"
+                >
+                  <!-- Directo -->
+                  <span
+                    v-if="permStatus(resource, action) === 'direct'"
+                    class="inline-flex h-6 w-6 items-center justify-center rounded bg-primary-500 text-white"
+                    :title="`${resource}.${action} — asignado directo`"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                  </span>
+                  <!-- Implicado -->
+                  <span
+                    v-else-if="permStatus(resource, action) === 'implied'"
+                    class="inline-flex h-6 w-6 items-center justify-center rounded bg-primary-100 text-primary-500"
+                    :title="`${resource}.${action} — implicado por dependencia de API`"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
+                      <path fill-rule="evenodd" d="M10.21 14.77a.75.75 0 01.02-1.06L14.168 10 10.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                      <path fill-rule="evenodd" d="M4.21 14.77a.75.75 0 01.02-1.06L8.168 10 4.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                    </svg>
+                  </span>
+                  <!-- Sin acceso -->
+                  <span
+                    v-else
+                    class="inline-flex h-6 w-6 items-center justify-center rounded bg-surface-100"
+                    :title="`${resource}.${action} — sin acceso`"
+                  >
+                    <span class="h-px w-3 rounded bg-surface-300"></span>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Leyenda -->
+        <div class="flex flex-wrap items-center gap-5 text-xs text-muted">
+          <div class="flex items-center gap-1.5">
+            <span class="h-4 w-4 shrink-0 rounded bg-primary-500"></span>
+            <span>Asignado directo</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="h-4 w-4 shrink-0 rounded border border-primary-200 bg-primary-100"></span>
+            <span>Implicado por dependencia de API</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="h-4 w-4 shrink-0 rounded border border-surface-200 bg-surface-100"></span>
+            <span>Sin acceso</span>
+          </div>
+        </div>
       </div>
     </UiCard>
 

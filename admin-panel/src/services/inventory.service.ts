@@ -5,6 +5,8 @@ import type {
   InventoryMovement,
   CreateInventoryAdjustmentDto,
   QueryInventoryMovementsDto,
+  QueryKardexDto,
+  KardexResult,
   Store,
   CreateStoreDto,
   UpdateStoreDto,
@@ -73,6 +75,11 @@ export const inventoryService = {
 
   async bulkUpsertProductStocks(dto: BulkUpsertProductStocksDto) {
     const res = await http.put<ApiResponse<{ totalUpdated: number; items: ProductStockOverview[] }>>('/inventory/stocks/bulk', dto)
+    return res.data.data
+  },
+
+  async kardex(params: QueryKardexDto) {
+    const res = await http.get<ApiResponse<KardexResult>>('/inventory/kardex', { params })
     return res.data.data
   },
 }

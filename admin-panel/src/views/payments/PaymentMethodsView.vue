@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
@@ -58,6 +58,12 @@ const emptyForm = (): UpsertPaymentMethodDto & { configJson: string } => ({
 
 const form = reactive(emptyForm())
 const configError = ref<string | null>(null)
+const isEnabledModel = computed<boolean>({
+  get: () => form.isEnabled ?? true,
+  set: (value) => {
+    form.isEnabled = value
+  },
+})
 
 async function load() {
   loading.value = true
@@ -241,7 +247,7 @@ onMounted(load)
           :rows="3"
         />
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
-          <FormToggleField v-model="form.isEnabled" label="Activo" />
+          <FormToggleField v-model="isEnabledModel" label="Activo" />
           <UiInput
             v-model.number="form.displayOrder"
             type="number"

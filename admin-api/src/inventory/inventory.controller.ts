@@ -26,6 +26,7 @@ import { BulkUpsertProductStocksDto } from './dto/bulk-upsert-product-stocks.dto
 import { BatchQueryProductStocksDto } from './dto/batch-query-product-stocks.dto';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
+import { QueryKardexDto } from './dto/query-kardex.dto';
 import { InventoryService } from './inventory.service';
 
 @ApiTags('Inventory')
@@ -41,6 +42,12 @@ export class InventoryController {
     @GetUser('id') userId: string,
   ) {
     return this.inventoryService.createMovement(dto, userId);
+  }
+
+  @Roles(...INVENTORY_READ_ROLES)
+  @Get('kardex')
+  kardex(@Query() query: QueryKardexDto) {
+    return this.inventoryService.getKardex(query);
   }
 
   @Roles(...INVENTORY_READ_ROLES)

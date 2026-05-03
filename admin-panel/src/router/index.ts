@@ -1,27 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { hasAccessToken } from '@/services/http'
-import { Role } from '@/types/api'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
 import UsersView from '@/views/users/UsersView.vue'
 import { preloadRichEditor } from '@/utils/preload-rich-editor'
-import {
-  BACKOFFICE_ROLES,
-  CATALOG_MANAGE_ROLES,
-  COUPON_READ_ROLES,
-  CURRENCY_MANAGE_ROLES,
-  INVENTORY_MANAGE_ROLES,
-  INVENTORY_READ_ROLES,
-  ORDER_READ_ROLES,
-  ORDER_MANAGE_ROLES,
-  PAYMENT_READ_ROLES,
-  PAYMENT_MANAGE_ROLES,
-  PRODUCT_MANAGE_ROLES,
-  PRODUCT_READ_ROLES,
-  SHIPMENT_READ_ROLES,
-  CARRIER_MANAGE_ROLES,
-  USER_READ_ROLES,
-} from '@/utils/permissions'
+import type { PermissionKey } from '@/utils/permissions'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -66,13 +49,13 @@ const router = createRouter({
           path: 'dashboard',
           name: 'dashboard',
           component: DashboardView,
-          meta: { title: 'Dashboard', roles: BACKOFFICE_ROLES },
+          meta: { title: 'Dashboard', permission: 'dashboard.read' },
         },
         {
           path: 'profile',
           name: 'profile',
           component: () => import('@/views/auth/ProfileView.vue'),
-          meta: { title: 'Perfil y Sesiones', roles: BACKOFFICE_ROLES },
+          meta: { title: 'Perfil y Sesiones', permission: 'profile.read' },
         },
 
         // Productos
@@ -80,25 +63,25 @@ const router = createRouter({
           path: 'products',
           name: 'products',
           component: () => import('@/views/products/ProductsView.vue'),
-          meta: { title: 'Productos', roles: PRODUCT_READ_ROLES },
+          meta: { title: 'Productos', permission: 'products.read' },
         },
         {
           path: 'products/new',
           name: 'products-new',
           component: () => import('@/views/products/ProductFormView.vue'),
-          meta: { title: 'Nuevo Producto', roles: PRODUCT_MANAGE_ROLES },
+          meta: { title: 'Nuevo Producto', permission: 'products.create' },
         },
         {
           path: 'products/:id',
           name: 'products-detail',
           component: () => import('@/views/products/ProductDetailView.vue'),
-          meta: { title: 'Detalle de Producto', roles: PRODUCT_READ_ROLES },
+          meta: { title: 'Detalle de Producto', permission: 'products.read' },
         },
         {
           path: 'products/:id/edit',
           name: 'products-edit',
           component: () => import('@/views/products/ProductFormView.vue'),
-          meta: { title: 'Editar Producto', roles: PRODUCT_MANAGE_ROLES },
+          meta: { title: 'Editar Producto', permission: 'products.update' },
         },
 
         // Órdenes
@@ -106,31 +89,31 @@ const router = createRouter({
           path: 'orders',
           name: 'orders',
           component: () => import('@/views/orders/OrdersView.vue'),
-          meta: { title: 'Órdenes', roles: ORDER_READ_ROLES },
+          meta: { title: 'Órdenes', permission: 'orders.read' },
         },
         {
           path: 'orders/new',
           name: 'orders-new',
           component: () => import('@/views/orders/OrderCreateView.vue'),
-          meta: { title: 'Nueva Orden', roles: ORDER_MANAGE_ROLES },
+          meta: { title: 'Nueva Orden', permission: 'orders.create' },
         },
         {
           path: 'orders/:id',
           name: 'orders-detail',
           component: () => import('@/views/orders/OrderDetailView.vue'),
-          meta: { title: 'Detalle de Orden', roles: ORDER_READ_ROLES },
+          meta: { title: 'Detalle de Orden', permission: 'orders.read' },
         },
         {
           path: 'notifications',
           name: 'notifications',
           component: () => import('@/views/notifications/NotificationsView.vue'),
-          meta: { title: 'Notificaciones', roles: BACKOFFICE_ROLES },
+          meta: { title: 'Notificaciones', permission: 'notifications.read' },
         },
         {
           path: 'chat',
           name: 'chat',
           component: () => import('@/views/chat/ChatView.vue'),
-          meta: { title: 'Chat', roles: BACKOFFICE_ROLES },
+          meta: { title: 'Chat', permission: 'chat.read' },
         },
 
         // Cupones
@@ -138,7 +121,7 @@ const router = createRouter({
           path: 'coupons',
           name: 'coupons',
           component: () => import('@/views/coupons/CouponsView.vue'),
-          meta: { title: 'Cupones', roles: COUPON_READ_ROLES },
+          meta: { title: 'Cupones', permission: 'coupons.read' },
         },
 
         // Pagos
@@ -146,13 +129,13 @@ const router = createRouter({
           path: 'payments',
           name: 'payments',
           component: () => import('@/views/payments/PaymentsView.vue'),
-          meta: { title: 'Pagos', roles: PAYMENT_READ_ROLES },
+          meta: { title: 'Pagos', permission: 'payments.read' },
         },
         {
           path: 'payment-methods',
           name: 'payment-methods',
           component: () => import('@/views/payments/PaymentMethodsView.vue'),
-          meta: { title: 'Metodos de pago', roles: PAYMENT_MANAGE_ROLES },
+          meta: { title: 'Metodos de pago', permission: 'payment-methods.read' },
         },
 
         // Envios
@@ -160,19 +143,19 @@ const router = createRouter({
           path: 'shipments',
           name: 'shipments',
           component: () => import('@/views/shipments/ShipmentsView.vue'),
-          meta: { title: 'Envios', roles: SHIPMENT_READ_ROLES },
+          meta: { title: 'Envios', permission: 'shipments.read' },
         },
         {
           path: 'shipments/:id',
           name: 'shipments-detail',
           component: () => import('@/views/shipments/ShipmentsView.vue'),
-          meta: { title: 'Detalle de envio', roles: SHIPMENT_READ_ROLES },
+          meta: { title: 'Detalle de envio', permission: 'shipments.read' },
         },
         {
           path: 'carriers',
           name: 'carriers',
           component: () => import('@/views/shipments/CarriersView.vue'),
-          meta: { title: 'Transportadoras', roles: CARRIER_MANAGE_ROLES },
+          meta: { title: 'Transportadoras', permission: 'carriers.read' },
         },
 
         // Usuarios
@@ -180,7 +163,13 @@ const router = createRouter({
           path: 'users',
           name: 'users',
           component: UsersView,
-          meta: { title: 'Usuarios', roles: USER_READ_ROLES },
+          meta: { title: 'Usuarios', permission: 'users.read' },
+        },
+        {
+          path: 'admin-tools/seeds',
+          name: 'admin-tools-seeds',
+          component: () => import('@/views/admin-tools/SeedManagerView.vue'),
+          meta: { title: 'Seeds por modulos', permission: 'admin-tools.read' },
         },
 
         // Inventario
@@ -188,19 +177,25 @@ const router = createRouter({
           path: 'inventory',
           name: 'inventory',
           component: () => import('@/views/inventory/InventoryView.vue'),
-          meta: { title: 'Inventario', roles: INVENTORY_READ_ROLES },
+          meta: { title: 'Inventario', permission: 'inventory.read' },
         },
         {
           path: 'inventory/stock',
           name: 'inventory-stock',
           component: () => import('@/views/inventory/InventoryStockView.vue'),
-          meta: { title: 'Stock por producto', roles: INVENTORY_READ_ROLES },
+          meta: { title: 'Stock por producto', permission: 'inventory.read' },
         },
         {
           path: 'inventory/stores',
           name: 'inventory-stores',
           component: () => import('@/views/inventory/InventoryStoresView.vue'),
-          meta: { title: 'Tiendas', roles: INVENTORY_MANAGE_ROLES },
+          meta: { title: 'Tiendas', permission: 'inventory.read' },
+        },
+        {
+          path: 'inventory/kardex',
+          name: 'inventory-kardex',
+          component: () => import('@/views/inventory/KardexView.vue'),
+          meta: { title: 'Kardex', permission: 'inventory.read' },
         },
 
         // Catálogo auxiliar
@@ -208,43 +203,43 @@ const router = createRouter({
           path: 'categories',
           name: 'categories',
           component: () => import('@/views/categories/CategoriesView.vue'),
-          meta: { title: 'Categorías', roles: CATALOG_MANAGE_ROLES },
+          meta: { title: 'Categorías', permission: 'categories.read' },
         },
         {
           path: 'sizes',
           name: 'sizes',
           component: () => import('@/views/sizes/SizesView.vue'),
-          meta: { title: 'Tallas', roles: CATALOG_MANAGE_ROLES },
+          meta: { title: 'Tallas', permission: 'sizes.read' },
         },
         {
           path: 'measurement-units',
           name: 'measurement-units',
           component: () => import('@/views/measurement-units/MeasurementUnitsView.vue'),
-          meta: { title: 'Tipos de medida', roles: CATALOG_MANAGE_ROLES },
+          meta: { title: 'Tipos de medida', permission: 'measurement-units.read' },
         },
         {
           path: 'colors',
           name: 'colors',
           component: () => import('@/views/colors/ColorsView.vue'),
-          meta: { title: 'Colores', roles: CATALOG_MANAGE_ROLES },
+          meta: { title: 'Colores', permission: 'colors.read' },
         },
         {
           path: 'currencies',
           name: 'currencies',
           component: () => import('@/views/currencies/CurrenciesView.vue'),
-          meta: { title: 'Tipo de moneda', roles: CURRENCY_MANAGE_ROLES },
+          meta: { title: 'Tipo de moneda', permission: 'currencies.read' },
         },
           {
             path: 'tags',
             name: 'tags',
             component: () => import('@/views/tags/TagsView.vue'),
-            meta: { title: 'Tags', roles: CATALOG_MANAGE_ROLES },
+            meta: { title: 'Tags', permission: 'tags.read' },
           },
         {
           path: 'email-templates',
           name: 'email-templates',
           component: () => import('@/views/email-templates/EmailTemplatesView.vue'),
-          meta: { title: 'Plantillas de email', roles: CATALOG_MANAGE_ROLES },
+          meta: { title: 'Plantillas de email', permission: 'email-templates.read' },
         },
       ],
     },
@@ -276,13 +271,8 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (!isPublicRoute && auth.isAuthenticated && auth.currentRole !== Role.SUPER_ADMIN) {
-    await auth.logout()
-    return { name: 'login', query: { reason: 'role-not-allowed' } }
-  }
-
-  const requiredRoles = to.meta.roles as readonly Role[] | undefined
-  if (!isPublicRoute && requiredRoles && !auth.canAccessRoles(requiredRoles)) {
+  const requiredPermission = to.meta.permission as PermissionKey | undefined
+  if (!isPublicRoute && requiredPermission && !auth.can(requiredPermission)) {
     return { name: 'dashboard' }
   }
 

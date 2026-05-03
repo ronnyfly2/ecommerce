@@ -5,7 +5,7 @@ import { clearTokens } from '@/services/http'
 import { useNotificationsStore } from '@/stores/notifications'
 import type { User, LoginDto, RegisterDto, UpdateProfileDto } from '@/types/api'
 import { Role } from '@/types/api'
-import { hasRolePermission, hasRouteAccess, type PermissionKey } from '@/utils/permissions'
+import { hasPermission, hasRouteAccess, type AppPermission } from '@/utils/permissions'
 
 export const useAuthStore = defineStore('auth', () => {
   const notifications = useNotificationsStore()
@@ -35,10 +35,6 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const { user: me } = await authService.login(dto)
-      if (me.role !== Role.SUPER_ADMIN) {
-        await authService.logout()
-        throw new Error('Solo usuarios SUPERADMIN_USER pueden ingresar')
-      }
       notifications.reset()
       user.value = me
     } finally {
@@ -50,10 +46,6 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const { user: me } = await authService.register(dto)
-      if (me.role !== Role.SUPER_ADMIN) {
-        await authService.logout()
-        throw new Error('El registro debe crear un usuario SUPERADMIN_USER')
-      }
       notifications.reset()
       user.value = me
     } finally {
@@ -90,12 +82,16 @@ export const useAuthStore = defineStore('auth', () => {
     clearTokens()
   }
 
-  function can(permission: PermissionKey) {
-    return hasRolePermission(currentRole.value, permission)
+  function can(permission: AppPermission) {
+    return hasPermission(
+      currentRole.value,
+      user.value?.effectivePermissions ?? user.value?.grantedPermissions,
+      permission,
+    )
   }
 
   function canAccessRoles(roles?: readonly Role[]) {
-    return hasRouteAccess(currentRole.value, roles)
+    return hasRouteAccess(currentRole.value, roles, user.value?.grantedRoles)
   }
 
   return {

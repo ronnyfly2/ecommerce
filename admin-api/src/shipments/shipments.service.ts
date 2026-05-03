@@ -77,7 +77,7 @@ export class ShipmentsService {
 
     const [items, total] = await this.shipmentsRepository.findAndCount({
       where,
-      relations: { order: { user: true }, carrier: true },
+      relations: { order: { user: true, pickupStore: true }, carrier: true },
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -400,7 +400,7 @@ export class ShipmentsService {
     const shipment = await this.shipmentsRepository.findOne({
       where: { id },
       relations: {
-        order: { user: true },
+        order: { user: true, pickupStore: true },
         carrier: true,
         items: { orderItem: { variant: { product: true }, product: true } },
       },
@@ -414,7 +414,7 @@ export class ShipmentsService {
       .findOne({
         where: { id },
         relations: {
-          order: { user: true },
+          order: { user: true, pickupStore: true },
           carrier: true,
           items: { orderItem: { variant: { product: true }, product: true } },
         },

@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { SeedTarget } from './seed-target.dto';
 
 export enum SeedCleanMode {
   SEED = 'seed',
@@ -24,4 +25,15 @@ export class CleanSeedDto {
   @IsOptional()
   @IsString()
   confirmationPhrase?: string;
+
+  @ApiPropertyOptional({
+    enum: SeedTarget,
+    isArray: true,
+    description: 'Optional subset of seed targets when mode=seed.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(SeedTarget, { each: true })
+  targets?: SeedTarget[];
 }

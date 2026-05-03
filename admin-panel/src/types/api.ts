@@ -99,6 +99,9 @@ export interface User {
   firstName: string | null
   lastName: string | null
   role: Role
+  grantedRoles: Role[]
+  grantedPermissions: string[]
+  effectivePermissions?: string[]
   isActive: boolean
   avatar: string | null
   createdAt: string
@@ -149,6 +152,19 @@ export interface ResetPasswordDto {
 }
 
 export type SeedCleanMode = 'seed' | 'users-all' | 'all'
+export type SeedRunTarget =
+  | 'access'
+  | 'sizes'
+  | 'colors'
+  | 'currencies'
+  | 'categories'
+  | 'tags'
+  | 'products'
+  | 'coupons'
+  | 'orders'
+  | 'carriers'
+  | 'shipments'
+  | 'notifications'
 
 // ----------------------------------------------------------
 // Users
@@ -159,6 +175,8 @@ export interface CreateUserDto {
   firstName?: string
   lastName?: string
   role?: Role
+  grantedRoles?: Role[]
+  grantedPermissions?: string[]
 }
 
 export interface UpdateUserDto {
@@ -167,6 +185,8 @@ export interface UpdateUserDto {
   firstName?: string
   lastName?: string
   role?: Role
+  grantedRoles?: Role[]
+  grantedPermissions?: string[]
   isActive?: boolean
 }
 
@@ -526,6 +546,8 @@ export interface Store {
   city: string
   country: string
   address: string | null
+  lat: string | null
+  lng: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -537,6 +559,8 @@ export interface CreateStoreDto {
   city: string
   country: string
   address?: string
+  lat?: number
+  lng?: number
   isActive?: boolean
 }
 
@@ -799,6 +823,71 @@ export interface QueryInventoryMovementsDto {
   limit?: number
   variantId?: string
   productId?: string
+}
+
+export interface KardexVariant {
+  id: string
+  sku: string
+  size: { id: string; name: string } | null
+  color: { id: string; name: string } | null
+}
+
+export interface KardexStore {
+  id: string
+  code: string
+  name: string
+}
+
+export interface KardexCreatedBy {
+  id: string
+  email: string
+  firstName: string | null
+}
+
+export interface KardexEntry {
+  id: string
+  date: string
+  type: InventoryMovementType
+  channelType: InventoryChannel | null
+  store: KardexStore | null
+  variant: KardexVariant | null
+  quantityChange: number
+  entrada: number
+  salida: number
+  balance: number
+  reason: string | null
+  createdBy: KardexCreatedBy | null
+}
+
+export interface KardexMeta {
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+  balanceBefore: number
+}
+
+export interface KardexProduct {
+  id: string
+  name: string
+  sku: string
+  stock: number
+}
+
+export interface KardexResult {
+  product: KardexProduct
+  items: KardexEntry[]
+  meta: KardexMeta
+}
+
+export interface QueryKardexDto {
+  productId: string
+  channelType?: InventoryChannel
+  storeId?: string
+  startDate?: string
+  endDate?: string
+  page?: number
+  limit?: number
 }
 
 // ----------------------------------------------------------

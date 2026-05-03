@@ -38,6 +38,7 @@ useDialogA11y(computed(() => props.show), panelRef, () => emit('close'))
           :class="[
             'relative card w-full',
             props.size === 'sm' ? 'max-w-sm'  :
+            props.size === 'md' ? 'max-w-131.25' :
             props.size === 'lg' ? 'max-w-2xl' :
             props.size === 'xl' ? 'max-w-4xl' :
                             'max-w-lg',
