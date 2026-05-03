@@ -301,7 +301,7 @@ onMounted(async () => {
 <template>
   <div class="space-y-4">
     <UiCard v-if="canManageInventory" title="Stock por canal y tienda">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 px-6 py-4">
         <UiSelect
           v-model="stockEditor.productId"
           searchable
@@ -378,6 +378,11 @@ onMounted(async () => {
 
     <UiCard :padding="false">
       <UiTable :data="movements" :loading="tableLoading" :empty="tableEmpty" :columns="tableColumns" loading-color="primary" loading-text="Cargando movimientos..." empty-message="Sin movimientos de inventario">
+        <template #empty-icon>
+          <svg class="w-12 h-12 text-primary-800 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+        </template>
 
         <tr v-for="m in movements ?? []" :key="m.id" class="table-tr-hover">
           <td class="table-td text-xs text-muted">{{ new Date(m.createdAt).toLocaleString('es-AR') }}</td>

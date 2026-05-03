@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { measurementUnitsService } from '@/services/catalog.service'
 import type { MeasurementUnit, MeasurementUnitFamily } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
@@ -10,9 +10,7 @@ import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiTable from '@/components/ui/UiTable.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiSelect from '@/components/ui/UiSelect.vue'
-import CatalogAuditHead from '@/components/catalog/CatalogAuditHead.vue'
 import CatalogAuditCells from '@/components/catalog/CatalogAuditCells.vue'
-import CatalogActionsHead from '@/components/catalog/CatalogActionsHead.vue'
 import CatalogActionsCell from '@/components/catalog/CatalogActionsCell.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
 import FormModalLayout from '@/components/forms/FormModalLayout.vue'
@@ -35,6 +33,16 @@ const familyOptions = (Object.keys(familyLabels) as MeasurementUnitFamily[]).map
   value: family,
   label: familyLabels[family],
 }))
+const tableColumns = [
+  { key: 'code', label: 'Codigo' },
+  { key: 'label', label: 'Etiqueta' },
+  { key: 'family', label: 'Familia' },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'order', label: 'Orden', align: 'center' as const },
+  { key: 'createdAt', label: 'Creado', align: 'center' as const },
+  { key: 'updatedAt', label: 'Actualizado', align: 'center' as const },
+  { key: 'actions', actions: true },
+]
 
 const { items: measurementUnits, loading: tableLoading, load } = useResourceList<MeasurementUnit>(
   async () => {
@@ -47,6 +55,7 @@ const { items: measurementUnits, loading: tableLoading, load } = useResourceList
   },
   'No se pudieron cargar los tipos de medida',
 )
+const tableEmpty = computed(() => !tableLoading.value && (measurementUnits.value?.length ?? 0) === 0)
 
 function normalizeCode(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, '-')
@@ -99,20 +108,16 @@ onMounted(load)
       <UiTable
         :data="measurementUnits"
         :loading="tableLoading"
+        :empty="tableEmpty"
+        :columns="tableColumns"
         loading-color="primary"
         loading-text="Cargando tipos de medida..."
         empty-message="No hay tipos de medida"
       >
-        <template #head>
-          <tr>
-            <th class="table-th">Codigo</th>
-            <th class="table-th">Etiqueta</th>
-            <th class="table-th">Familia</th>
-            <th class="table-th text-center">Estado</th>
-            <th class="table-th text-center">Orden</th>
-            <CatalogAuditHead />
-            <CatalogActionsHead />
-          </tr>
+        <template #empty-icon>
+          <svg class="w-12 h-12 text-primary-800 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
         </template>
 
         <tr v-for="unit in measurementUnits ?? []" :key="unit.id" class="table-tr-hover">

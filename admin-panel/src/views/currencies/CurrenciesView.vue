@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { currenciesService } from '@/services/currencies.service'
 import type { Currency } from '@/types/api'
 import UiCard from '@/components/ui/UiCard.vue'
@@ -9,7 +9,6 @@ import UiModal from '@/components/ui/UiModal.vue'
 import UiConfirm from '@/components/ui/UiConfirm.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiTable from '@/components/ui/UiTable.vue'
-import CatalogActionsHead from '@/components/catalog/CatalogActionsHead.vue'
 import CatalogActionsCell from '@/components/catalog/CatalogActionsCell.vue'
 import FormModalActions from '@/components/forms/FormModalActions.vue'
 import FormModalLayout from '@/components/forms/FormModalLayout.vue'
@@ -61,6 +60,17 @@ const { formModal, confirm, openCreate, openEdit, save: saveCurrency, askDelete,
   onSuccess: load,
 })
 
+const tableColumns = [
+  { key: 'code', label: 'Codigo' },
+  { key: 'name', label: 'Nombre' },
+  { key: 'symbol', label: 'Simbolo' },
+  { key: 'rate', label: 'Tipo de cambio (1 USD = X)', align: 'right' as const },
+  { key: 'status', label: 'Estado', align: 'center' as const },
+  { key: 'actions', actions: true },
+]
+
+const tableEmpty = computed(() => !tableLoading.value && (currencies.value?.length ?? 0) === 0)
+
 onMounted(load)
 </script>
 
@@ -80,16 +90,11 @@ onMounted(load)
     </ListViewToolbar>
 
     <UiCard :padding="false">
-      <UiTable :data="currencies" :loading="tableLoading" loading-color="primary" loading-text="Cargando monedas..." empty-message="No hay monedas">
-        <template #head>
-          <tr>
-            <th class="table-th">Codigo</th>
-            <th class="table-th">Nombre</th>
-            <th class="table-th">Simbolo</th>
-            <th class="table-th text-right">Tipo de cambio (1 USD = X)</th>
-            <th class="table-th text-center">Estado</th>
-            <CatalogActionsHead />
-          </tr>
+      <UiTable :data="currencies" :loading="tableLoading" :empty="tableEmpty" :columns="tableColumns" loading-color="primary" loading-text="Cargando monedas..." empty-message="No hay monedas">
+        <template #empty-icon>
+          <svg class="w-12 h-12 text-primary-800 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
         </template>
 
         <tr v-for="c in currencies ?? []" :key="c.id" class="table-tr-hover">
