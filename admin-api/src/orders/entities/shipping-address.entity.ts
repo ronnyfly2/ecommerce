@@ -40,6 +40,12 @@ export class ShippingAddress {
   @Column({ type: 'varchar', nullable: true })
   phoneNumber: string | null;
 
+  @Column({ type: 'numeric', precision: 10, scale: 6, nullable: true })
+  lat: string | null;
+
+  @Column({ type: 'numeric', precision: 10, scale: 6, nullable: true })
+  lng: string | null;
+
   @Column({ name: 'is_default', default: true })
   isDefault: boolean;
 }

@@ -8,6 +8,8 @@ import {
   IsOptional,
   Min,
   IsEnum,
+  IsLatitude,
+  IsLongitude,
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -46,6 +48,16 @@ export class ShippingAddressDto {
   @IsOptional()
   @IsString()
   phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: -12.0464 })
+  @IsOptional()
+  @IsLatitude()
+  lat?: number;
+
+  @ApiPropertyOptional({ example: -77.0428 })
+  @IsOptional()
+  @IsLongitude()
+  lng?: number;
 }
 
 export class CreateOrderItemDto {

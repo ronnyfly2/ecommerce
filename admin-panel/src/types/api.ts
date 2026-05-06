@@ -536,6 +536,8 @@ export interface ShippingAddress {
   postalCode: string
   country: string
   phoneNumber: string | null
+  lat: string | null
+  lng: string | null
   isDefault: boolean
 }
 
@@ -631,6 +633,8 @@ export interface CreateOrderDto {
     postalCode: string
     country: string
     phoneNumber?: string
+    lat?: number
+    lng?: number
   }
 }
 

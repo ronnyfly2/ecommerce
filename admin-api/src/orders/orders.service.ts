@@ -227,8 +227,11 @@ export class OrdersService {
     });
 
     if (dto.shippingAddress) {
+      const { lat, lng, ...addressFields } = dto.shippingAddress;
       const address = this.addressesRepository.create({
-        ...dto.shippingAddress,
+        ...addressFields,
+        lat: lat != null ? String(lat) : null,
+        lng: lng != null ? String(lng) : null,
       });
 
       order.shippingAddresses = [address];

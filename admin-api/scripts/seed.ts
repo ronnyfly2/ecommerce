@@ -18,6 +18,9 @@ import { OrderStatus } from '../src/orders/enums/order-status.enum';
 import { Product } from '../src/products/entities/product.entity';
 import { ProductImage } from '../src/products/entities/product-image.entity';
 import { ProductVariant } from '../src/products/entities/product-variant.entity';
+import { PaymentMethod } from '../src/payments/entities/payment-method.entity';
+import { PaymentMethodType } from '../src/payments/enums/payment-method-type.enum';
+import { PaymentProviderType } from '../src/payments/enums/payment-provider-type.enum';
 import { Carrier } from '../src/shipments/entities/carrier.entity';
 import { Shipment } from '../src/shipments/entities/shipment.entity';
 import { ShipmentEvent } from '../src/shipments/entities/shipment-event.entity';
@@ -71,6 +74,7 @@ async function seed() {
     const inventoryRepository = AppDataSource.getRepository(InventoryMovement);
     const orderRepository = AppDataSource.getRepository(Order);
     const carrierRepository = AppDataSource.getRepository(Carrier);
+    const paymentMethodRepository = AppDataSource.getRepository(PaymentMethod);
     const shipmentRepository = AppDataSource.getRepository(Shipment);
     const shipmentItemRepository = AppDataSource.getRepository(ShipmentItem);
     const shipmentEventRepository = AppDataSource.getRepository(ShipmentEvent);
@@ -752,6 +756,76 @@ async function seed() {
       externalCarrier.trackingUrlTemplate = 'https://tracking.seedexpress.local/{tracking}';
     }
     externalCarrier = await carrierRepository.save(externalCarrier);
+
+    // Upsert default payment methods (operational config, idempotent)
+    const paymentMethodSeeds: Array<{
+      code: string;
+      label: string;
+      description: string;
+      provider: PaymentProviderType;
+      type: PaymentMethodType;
+      isEnabled: boolean;
+      displayOrder: number;
+      instructions: string | null;
+    }> = [
+      {
+        code: 'cash-on-delivery',
+        label: 'Pago contra entrega',
+        description: 'El cliente paga en efectivo al recibir el pedido',
+        provider: PaymentProviderType.CASH_ON_DELIVERY,
+        type: PaymentMethodType.CASH,
+        isEnabled: true,
+        displayOrder: 0,
+        instructions: 'Ten el monto exacto listo. El repartidor entregará un comprobante.',
+      },
+      {
+        code: 'bank-transfer',
+        label: 'Transferencia bancaria',
+        description: 'Transferencia manual con verificación por el equipo',
+        provider: PaymentProviderType.MANUAL_TRANSFER,
+        type: PaymentMethodType.BANK_TRANSFER,
+        isEnabled: true,
+        displayOrder: 1,
+        instructions:
+          'Transfiere a la cuenta BCP 191-12345678-0-90 (CCI 002-191-001234567890-12) y sube el comprobante.',
+      },
+      {
+        code: 'stripe-card',
+        label: 'Tarjeta de crédito/débito',
+        description: 'Pago con tarjeta procesado por Stripe',
+        provider: PaymentProviderType.STRIPE,
+        type: PaymentMethodType.CREDIT_CARD,
+        isEnabled: false,
+        displayOrder: 2,
+        instructions: null,
+      },
+    ];
+
+    for (const seed of paymentMethodSeeds) {
+      let method = await paymentMethodRepository.findOne({ where: { code: seed.code } });
+      if (!method) {
+        method = paymentMethodRepository.create({
+          code: seed.code,
+          label: seed.label,
+          description: seed.description,
+          provider: seed.provider,
+          type: seed.type,
+          isEnabled: seed.isEnabled,
+          displayOrder: seed.displayOrder,
+          instructions: seed.instructions,
+          config: {},
+        });
+      } else {
+        method.label = seed.label;
+        method.description = seed.description;
+        method.provider = seed.provider;
+        method.type = seed.type;
+        method.displayOrder = seed.displayOrder;
+        method.instructions = seed.instructions;
+        // Preserve isEnabled and config when re-running, so manual ops decisions stick.
+      }
+      await paymentMethodRepository.save(method);
+    }
 
     // Cleanup and recreate seed shipments for idempotent runs
     const existingSeedShipments = await shipmentRepository.find({

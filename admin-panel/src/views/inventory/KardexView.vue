@@ -316,22 +316,22 @@ onMounted(async () => {
 
     <!-- Resumen del producto seleccionado -->
     <div v-if="result?.product" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <UiCard padding class="!p-4">
+      <UiCard padding class="p-4!">
         <p class="text-xs text-muted mb-1">Producto</p>
         <p class="font-semibold text-surface-900 truncate">{{ result.product.name }}</p>
         <p class="text-xs text-muted">{{ result.product.sku }}</p>
       </UiCard>
-      <UiCard padding class="!p-4">
+      <UiCard padding class="p-4!">
         <p class="text-xs text-muted mb-1">Stock actual</p>
         <p :class="['text-2xl font-bold', result.product.stock < 0 ? 'text-danger-600' : result.product.stock === 0 ? 'text-warning-600' : 'text-success-700']">
           {{ result.product.stock }}
         </p>
       </UiCard>
-      <UiCard padding class="!p-4">
+      <UiCard padding class="p-4!">
         <p class="text-xs text-muted mb-1">Total movimientos</p>
         <p class="text-2xl font-bold text-surface-900">{{ result.meta.total }}</p>
       </UiCard>
-      <UiCard padding class="!p-4">
+      <UiCard padding class="p-4!">
         <p class="text-xs text-muted mb-1">Saldo al inicio de página</p>
         <p :class="['text-2xl font-bold', result.meta.balanceBefore < 0 ? 'text-danger-600' : 'text-surface-900']">
           {{ result.meta.balanceBefore }}
@@ -425,7 +425,7 @@ onMounted(async () => {
           </td>
 
           <!-- Motivo -->
-          <td class="table-td text-xs text-muted max-w-[160px] truncate" :title="entry.reason ?? ''">
+          <td class="table-td text-xs text-muted max-w-40 truncate" :title="entry.reason ?? ''">
             {{ entry.reason || '—' }}
           </td>
 
