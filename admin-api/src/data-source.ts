@@ -30,6 +30,8 @@ import { Carrier } from './shipments/entities/carrier.entity';
 import { Shipment } from './shipments/entities/shipment.entity';
 import { ShipmentEvent } from './shipments/entities/shipment-event.entity';
 import { ShipmentItem } from './shipments/entities/shipment-item.entity';
+import { Template } from './templates/entities/template.entity';
+import { PdfDraft } from './admin-tools/entities/pdf-draft.entity';
 
 dotenv.config({ path: '.env' });
 
@@ -71,6 +73,8 @@ export const AppDataSource = new DataSource({
     Shipment,
     ShipmentEvent,
     ShipmentItem,
+    Template,
+    PdfDraft,
   ],
   migrations: ['src/migration/*.ts'],
   logging: false,

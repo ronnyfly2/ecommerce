@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "e2e": "cypress run",
     "e2e:open": "cypress open",
+    "e2e:run:pdf-editor": "cypress run --spec 'cypress/e2e/pdf-editor.cy.ts'",
     "e2e:run:a11y": "cypress run --spec 'cypress/e2e/accessibility.a11y.cy.ts'",
     "e2e:run:orders": "cypress run --spec 'cypress/e2e/orders.role-filtering.cy.ts'",
     "e2e:run:errors": "cypress run --spec 'cypress/e2e/error-handling.cy.ts'"
@@ -19,8 +20,12 @@
     "@vueuse/core": "^14.2.1",
     "axios": "^1.13.6",
     "leaflet": "^1.9.4",
+    "mammoth": "^1.12.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
     "pinia": "^3.0.4",
     "quill": "^2.0.3",
+    "signature_pad": "^5.1.1",
     "socket.io-client": "^4.8.3",
     "vue": "^3.5.30",
     "vue-router": "^4.6.4"

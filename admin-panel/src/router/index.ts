@@ -171,6 +171,12 @@ const router = createRouter({
           component: () => import('@/views/admin-tools/SeedManagerView.vue'),
           meta: { title: 'Seeds por modulos', permission: 'admin-tools.read' },
         },
+        {
+          path: 'admin-tools/pdf-editor',
+          name: 'admin-tools-pdf-editor',
+          component: () => import('@/views/admin-tools/PdfEditorView.vue'),
+          meta: { title: 'Editor PDF', permission: 'admin-tools.read' },
+        },
 
         // Inventario
         {
@@ -240,6 +246,12 @@ const router = createRouter({
           name: 'email-templates',
           component: () => import('@/views/email-templates/EmailTemplatesView.vue'),
           meta: { title: 'Plantillas de email', permission: 'email-templates.read' },
+        },
+        {
+          path: 'templates',
+          name: 'templates',
+          component: () => import('@/views/templates/TemplatesManagerViewNew.vue'),
+          meta: { title: 'Gestor de Templates', permission: 'admin-tools.read' },
         },
       ],
     },

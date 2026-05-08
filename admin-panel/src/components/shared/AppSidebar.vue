@@ -101,6 +101,12 @@ const nav: NavItem[] = [
     permission: 'admin-tools.read',
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5a.75.75 0 011.5 0v.879a3.75 3.75 0 012.86 2.86h.879a.75.75 0 010 1.5h-.879a3.75 3.75 0 01-2.86 2.86v.879a.75.75 0 01-1.5 0v-.879a3.75 3.75 0 01-2.86-2.86H7.5a.75.75 0 010-1.5h.879a3.75 3.75 0 012.86-2.86V4.5zM12 7.5a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5zM4.5 15a.75.75 0 01.75.75v.75h.75a.75.75 0 010 1.5h-.75v.75a.75.75 0 01-1.5 0V18h-.75a.75.75 0 010-1.5h.75v-.75A.75.75 0 014.5 15zm15 0a.75.75 0 01.75.75v.75H21a.75.75 0 010 1.5h-.75v.75a.75.75 0 01-1.5 0V18H18a.75.75 0 010-1.5h.75v-.75a.75.75 0 01.75-.75z"/>`,
   },
+  {
+    name: 'admin-tools-pdf-editor',
+    label: 'Editor PDF',
+    permission: 'admin-tools.read',
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-8.25A2.25 2.25 0 0017.25 3.75h-10.5A2.25 2.25 0 004.5 6v12A2.25 2.25 0 006.75 20.25h5.25M9 7.5h6M9 10.5h6M9 13.5h3m6.75 2.25l3 3m0 0l-3 3m3-3h-9"/>`,
+  },
 ]
 
 const catalogNav: NavItem[] = [
@@ -145,6 +151,12 @@ const catalogNav: NavItem[] = [
     label: 'Plantillas de email',
     permission: 'email-templates.read',
     icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>`,
+  },
+  {
+    name: 'templates',
+    label: 'Templates web',
+    permission: 'admin-tools.read',
+    icon: `<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25A2.25 2.25 0 016.75 3h10.5a2.25 2.25 0 012.25 2.25v13.5A2.25 2.25 0 0117.25 21H6.75a2.25 2.25 0 01-2.25-2.25V5.25zM8.25 7.5h7.5M8.25 11.25h7.5M8.25 15h4.5"/>`,
   },
   {
     name: 'payment-methods',

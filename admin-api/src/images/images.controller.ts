@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -67,7 +68,7 @@ export class ImagesController {
       },
     }),
   )
-  upload(@UploadedFile() file: Multer.File) {
-    return this.imagesService.buildPublicUrl(file.filename);
+  upload(@Req() request: Request, @UploadedFile() file: Multer.File) {
+    return this.imagesService.buildPublicUrl(request, file.filename);
   }
 }

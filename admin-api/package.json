@@ -21,6 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:run": "ts-node -r tsconfig-paths/register scripts/migrations.ts",
     "migration:revert": "ts-node -r tsconfig-paths/register scripts/migration-revert.ts",
+    "templates:bootstrap": "ts-node -r tsconfig-paths/register scripts/templates-bootstrap.ts",
     "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts",
     "seed:clean": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --all",
     "seed:clean:force": "ts-node -r tsconfig-paths/register scripts/seed-clean.ts --seed --force",

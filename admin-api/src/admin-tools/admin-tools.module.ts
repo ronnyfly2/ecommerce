@@ -19,7 +19,9 @@ import { Shipment } from '../shipments/entities/shipment.entity';
 import { ShipmentItem } from '../shipments/entities/shipment-item.entity';
 import { ShipmentEvent } from '../shipments/entities/shipment-event.entity';
 import { Notification } from '../notifications/entities/notification.entity';
+import { PdfDraft } from './entities/pdf-draft.entity';
 import { AdminToolsController } from './admin-tools.controller';
+import { AdminToolsPdfDraftsController } from './admin-tools-pdf-drafts.controller';
 import { AdminToolsService } from './admin-tools.service';
 
 @Module({
@@ -44,9 +46,10 @@ import { AdminToolsService } from './admin-tools.service';
       ShipmentItem,
       ShipmentEvent,
       Notification,
+      PdfDraft,
     ]),
   ],
-  controllers: [AdminToolsController],
+  controllers: [AdminToolsController, AdminToolsPdfDraftsController],
   providers: [AdminToolsService],
 })
 export class AdminToolsModule {}

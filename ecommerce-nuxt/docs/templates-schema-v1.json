@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ecommerce.local/schemas/templates/template-document-1.0.0.json",
+  "title": "TemplateDocument",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "sections"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["templateKey", "channel", "pageType", "schemaVersion"],
+      "properties": {
+        "templateKey": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$"
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["web"]
+        },
+        "pageType": {
+          "type": "string",
+          "enum": ["home", "category"]
+        },
+        "schemaVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/TemplateSection"
+      }
+    }
+  },
+  "$defs": {
+    "TemplateSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "componentKey", "props", "order"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{3,64}$"
+        },
+        "componentKey": {
+          "type": "string",
+          "enum": ["hero", "banner", "product-grid", "rich-text", "cta"]
+        },
+        "props": {
+          "type": "object"
+        },
+        "dataSource": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        },
+        "visibilityRules": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "componentKey": {
+                "const": "hero"
+              }
+            },
+            "required": ["componentKey"]
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/HeroProps"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "componentKey": {
+                "const": "banner"
+              }
+            },
+            "required": ["componentKey"]
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/BannerProps"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "componentKey": {
+                "const": "product-grid"
+              }
+            },
+            "required": ["componentKey"]
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/ProductGridProps"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "componentKey": {
+                "const": "rich-text"
+              }
+            },
+            "required": ["componentKey"]
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/RichTextProps"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "componentKey": {
+                "const": "cta"
+              }
+            },
+            "required": ["componentKey"]
+          },
+          "then": {
+            "properties": {
+              "props": {
+                "$ref": "#/$defs/CtaProps"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "HeroProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "subtitle": { "type": "string", "maxLength": 240 },
+        "imageUrl": { "$ref": "#/$defs/UrlOrPath" },
+        "ctaLabel": { "type": "string", "maxLength": 40 },
+        "ctaHref": { "$ref": "#/$defs/UrlOrPath" }
+      }
+    },
+    "BannerProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "tone": {
+          "type": "string",
+          "enum": ["info", "success", "warning", "danger"]
+        },
+        "dismissible": { "type": "boolean" }
+      }
+    },
+    "ProductGridProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "title": { "type": "string", "maxLength": 120 },
+        "source": {
+          "type": "string",
+          "enum": ["featured", "new_arrivals", "by_category"]
+        },
+        "categorySlug": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{2,80}$"
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 24 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": { "const": "by_category" }
+            },
+            "required": ["source"]
+          },
+          "then": {
+            "required": ["categorySlug"]
+          }
+        }
+      ]
+    },
+    "RichTextProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body"],
+      "properties": {
+        "title": { "type": "string", "maxLength": 120 },
+        "body": { "type": "string", "minLength": 1, "maxLength": 5000 }
+      }
+    },
+    "CtaProps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "buttonLabel", "buttonHref"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 240 },
+        "buttonLabel": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "buttonHref": { "$ref": "#/$defs/UrlOrPath" }
+      }
+    },
+    "UrlOrPath": {
+      "type": "string",
+      "pattern": "^(https?:\\/\\/[^\\s]+|\\/[^\\s]*)$"
+    }
+  }
+}

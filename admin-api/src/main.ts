@@ -24,7 +24,7 @@ async function bootstrap() {
         .map((origin) => origin.trim())
         .filter(Boolean)
     : [];
-  const defaultDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'];
+  const defaultDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174', 'http://localhost:3003', 'http://127.0.0.1:3003'];
   const allowedOrigins =
     configuredOrigins.length > 0 ? configuredOrigins : isProduction ? [] : defaultDevOrigins;
 

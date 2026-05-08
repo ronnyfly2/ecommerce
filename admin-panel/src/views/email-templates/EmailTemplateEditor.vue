@@ -299,7 +299,7 @@ async function sendTest() {
             <iframe
               :srcdoc="preview.html"
               class="w-full h-140 bg-white"
-              sandbox="allow-same-origin"
+              sandbox="allow-same-origin allow-scripts"
               title="Preview del email"
             />
           </div>

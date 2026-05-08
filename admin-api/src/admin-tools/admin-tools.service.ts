@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -35,6 +36,8 @@ import { NotificationType } from '../notifications/enums/notification-type.enum'
 import { CleanSeedDto, SeedCleanMode } from './dto/clean-seed.dto';
 import { RunSeedDto, SeedRunTarget } from './dto/run-seed.dto';
 import { SeedTarget } from './dto/seed-target.dto';
+import { SavePdfDraftDto } from './dto/save-pdf-draft.dto';
+import { PdfDraft } from './entities/pdf-draft.entity';
 
 type MutationOutcome = 'created' | 'updated';
 const SEED_SCOPE = 'catalog-flow-v2';
@@ -82,9 +85,101 @@ export class AdminToolsService {
     private readonly shipmentRepository: Repository<Shipment>,
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
+    @InjectRepository(PdfDraft)
+    private readonly pdfDraftRepository: Repository<PdfDraft>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
   ) {}
+
+  async savePdfDraft(userId: string, dto: SavePdfDraftDto) {
+    const documentKey = dto.documentKey.trim();
+    const fileName = dto.fileName.trim();
+
+    if (!documentKey) {
+      throw new BadRequestException('documentKey is required');
+    }
+
+    if (!fileName) {
+      throw new BadRequestException('fileName is required');
+    }
+
+    let draft = await this.pdfDraftRepository.findOne({
+      where: {
+        userId,
+        documentKey,
+      },
+    });
+
+    if (!draft) {
+      draft = this.pdfDraftRepository.create({
+        userId,
+        documentKey,
+        fileName,
+        totalPages: dto.totalPages,
+        draft: dto.draft,
+      });
+    } else {
+      draft.fileName = fileName;
+      draft.totalPages = dto.totalPages;
+      draft.draft = dto.draft;
+    }
+
+    const saved = await this.pdfDraftRepository.save(draft);
+
+    return {
+      id: saved.id,
+      documentKey: saved.documentKey,
+      fileName: saved.fileName,
+      totalPages: saved.totalPages,
+      draft: saved.draft,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
+  }
+
+  async getPdfDraft(userId: string, documentKey: string) {
+    const normalizedKey = documentKey.trim();
+    if (!normalizedKey) {
+      throw new BadRequestException('documentKey is required');
+    }
+
+    const draft = await this.pdfDraftRepository.findOne({
+      where: {
+        userId,
+        documentKey: normalizedKey,
+      },
+    });
+
+    if (!draft) {
+      return null;
+    }
+
+    return {
+      id: draft.id,
+      documentKey: draft.documentKey,
+      fileName: draft.fileName,
+      totalPages: draft.totalPages,
+      draft: draft.draft,
+      createdAt: draft.createdAt,
+      updatedAt: draft.updatedAt,
+    };
+  }
+
+  async deletePdfDraft(userId: string, documentKey: string) {
+    const normalizedKey = documentKey.trim();
+    if (!normalizedKey) {
+      throw new BadRequestException('documentKey is required');
+    }
+
+    const result = await this.pdfDraftRepository.delete({
+      userId,
+      documentKey: normalizedKey,
+    });
+
+    return {
+      deleted: (result.affected ?? 0) > 0,
+    };
+  }
 
   private assertEnabled() {
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';

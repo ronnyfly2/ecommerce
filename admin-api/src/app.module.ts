@@ -28,6 +28,7 @@ import { ChatModule } from './chat/chat.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ShipmentsModule } from './shipments/shipments.module';
+import { TemplatesModule } from './templates/templates.module';
 import { User } from './users/entities/user.entity';
 
 @Module({
@@ -80,6 +81,7 @@ import { User } from './users/entities/user.entity';
     ReviewsModule,
     PaymentsModule,
     ShipmentsModule,
+    TemplatesModule,
   ],
   controllers: [AppController],
   providers: [
